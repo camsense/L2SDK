@@ -4,7 +4,7 @@ CL2DeviceHandle::CL2DeviceHandle(){
 }
 
 CL2DeviceHandle::~CL2DeviceHandle(void){
-    m_pBase.uninit();
+    //m_pBase.uninit();
 }
 
 CL2DeviceHandle& CL2DeviceHandle::Instance(){
@@ -28,6 +28,7 @@ bool CL2DeviceHandle::starScanDevice()
 
 bool CL2DeviceHandle::stopScanDevice()
 {
+    m_pBase.setEnable(false);
     return m_pBase.StopScanCmd();
 }
 

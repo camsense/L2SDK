@@ -61,7 +61,6 @@ void signal_handler_IO(int status)
 	else
 	{
 		nread = read(g_fd, g_u8ReadBuff, 128);
-		//LOG_INFO("signal_handler_IO read=%d\n", nread);
 		std::lock_guard<std::mutex> lock(g_mtxBuff);
 		for (int i = 0; i < nread; i++)
 		{
@@ -238,7 +237,7 @@ int HC_serial::setPollMode(const char *chPort, const unsigned int iBauds)
 	m_fd = open(chPort, O_RDWR | O_NOCTTY | O_NDELAY);                    // Open port
 	if (m_fd == -1)
 	{
-		printf("errno=%d\n", errno);
+		//printf("errno=%d\n", errno);
 		return -2;
 	}                                                                   // If the device is not open, return -1
 

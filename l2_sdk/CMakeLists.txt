@@ -11,6 +11,7 @@ SET(L2_SRC l2_sdk.cpp
            L2DeviceHandle.h)
 
 ADD_LIBRARY(l2_sdk ${L2_SRC})
+#ADD_LIBRARY(l2_sdk SHARED ${L2_SRC})
 IF (WIN32)
 ELSE()
     TARGET_LINK_LIBRARIES(l2_sdk pthread)

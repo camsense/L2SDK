@@ -17,97 +17,169 @@ bool CBase::init(const char *chPort, int iBaute)
 
     clearPointBuffer();
     clearErrorCoed();
-
+    m_uDeviceAddr = 0x00;
+    
     if(chPort == NULL){
-        printf("port is null");
+        printf("port is null, errorcode:%d\r\n", ERROR_INIT_FAIL);
         writeErrorCode(ERROR_INIT_FAIL);
         return false;
     }
-
+    printf("chPort: %s, iBaute:%d\n", chPort, iBaute);
     if( m_serial.openDevice(chPort, iBaute) != 1){
-        printf(" open device is failed!\n" );
+        printf(" open device is failed! errorcode:%d\n", ERROR_INIT_FAIL);
         writeErrorCode(ERROR_INIT_FAIL);
         return false;
     }
 
+    m_thread_enable = true;
+    delay(1);
+
+    std::vector<unsigned char>().swap(m_lstBuff);
+
+    //std::thread threadRead(&CBase::ThreadCmd, this);
+    //threadRead.detach();
+    //std::thread threadParse(&CBase::ThreadParse, this);
+    //threadParse.detach();
+
+    m_threadCmd = std::thread(&CBase::ThreadCmd, this);
+    //m_threadCmd.detach();
+    m_threadParse = std::thread(&CBase::ThreadParse, this);
+    //m_threadParse.detach();
+    
     if (!StopScanCmd())
     {
         printf(" stop device  failed!\n" );
+        printf(" errorcode:%d\n",ERROR_STOPSCAN_CMD_FAIL );
         writeErrorCode(ERROR_STOPSCAN_CMD_FAIL);
         return false;
     }
-
-    #if  __linux__
-        delay(5);
-    #else
-        Sleep(5);
-    #endif
-
-
-    int addr = 0x00;
-    if (!getDeviceAddrCmd(addr))
+     delay(15);
+    if (!getDeviceAddrCmd())
     {
+        printf(" get addr cmd failed! errorcode:%d\r\n",ERROR_ADDR_CMD_FAIL );
         writeErrorCode(ERROR_ADDR_CMD_FAIL);
         return false;
     }
-    printf("addr: %d \r\n", addr);
-    
-   #if  __linux__
-        delay(5);
-    #else
-        Sleep(5);
-    #endif
-
+    delay(15);
     if (!getDeviceInfoCmd())
     {
+        printf(" get device info failed! errorcode:%d\n",ERROR_INFO_CMD_FAIL );
         writeErrorCode(ERROR_INFO_CMD_FAIL);
         return false;
     }
-    printf("init finish \r\n");
+    m_bInit = true;
+    delay(1000);
+    for(int i = 0; i < m_uDeviceAddr; i++){
+        DeviceInfo info;
+        stDeviceInfoPkg stDeviceInfoTemp = m_arrDeviceInfo[i];
+        //addr
+        info.addr = stDeviceInfoTemp.ucAddr;
+
+        char buf[128] = {0};
+        //ID 
+        for (int j = 0; j < 8; j++)
+        {
+            sprintf(buf, "%c", stDeviceInfoTemp.ucID[j]);
+        }
+        info.deviceID = buf;
+        
+         //
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "%c%c", stDeviceInfoTemp.ucManuInfo[0], stDeviceInfoTemp.ucManuInfo[1]);
+        info.factoryInfo = buf;
+
+        //productName
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "%c%c", stDeviceInfoTemp.ucProductInfo[0], stDeviceInfoTemp.ucProductInfo[1]);
+        info.productName = buf;
+
+        //version
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "%c%c.%c.%c", stDeviceInfoTemp.ucFirmwareVersion[0], 
+            stDeviceInfoTemp.ucFirmwareVersion[1],
+            stDeviceInfoTemp.ucFirmwareVersion[2], 
+            stDeviceInfoTemp.ucFirmwareVersion[3]);
+        info.firmwareVersion = buf;
+        m_vcDeviceInfo.push_back(info);
+    }
+    memset(m_arrDeviceInfo, 0, sizeof(m_arrDeviceInfo));
+    
+    m_thread_enable = false;
+    delay(5);
     return true;
 }
 
 bool CBase::uninit()
 {
-    std::vector<DeviceInfo> ().swap(m_vcDeviceInfo);
+    std::vector<DeviceInfo>().swap(m_vcDeviceInfo);
+    m_arrDeviceInfo[0];
     m_thread_enable = false;
+
+    if (m_threadCmd.joinable())
+			m_threadCmd.join();
+    if (m_threadParse.joinable())
+			m_threadParse.join();
+    //if (m_threadRun.joinable())
+	//		m_threadRun.join();
+    
+
     clearPointBuffer();
     clearErrorCoed();
     StopScanCmd();
     m_serial.closeDevice();
+    std::vector<unsigned char>().swap(m_lstBuff);
+    if(m_bInit){
+        return true;
+    }
     return false;
 }
 
-bool CBase::getDeviceAddrCmd(int &addr)
+
+bool CBase::getDeviceAddrCmd()
 {
-#if defined (_WIN32) || defined(_WIN64)
-    Sleep(2);
-#else 
-    delay(10);
-#endif
+    unsigned char  cData[4] = { 0x55, 0x0A,0x00, 0x5F };
+    if (m_serial.writeData2(cData, sizeof(cData)) != sizeof(cData))
+    {
+        printf("write DeviceAddrCmd failed!\n");
+        writeErrorCode(ERROR_ADDR_CMD_FAIL);
+        return false;
+    }
+    delay(100);
+    return  true;
+
+
+
+    #if 0
+    std::this_thread::sleep_for(std::chrono::milliseconds(15));
     m_serial.flushReceiver();
     unsigned char  cData[4] = { 0x55, 0x0A,0x00, 0x5F };
-    if (m_serial.writeData2(cData, sizeof(cData)) < 1)
+    if (m_serial.writeData2(cData, sizeof(cData)) != sizeof(cData))
     {
-        printf("write DeviceAddrCmd failed!");
+        printf("write DeviceAddrCmd failed!\n");
         writeErrorCode(ERROR_ADDR_CMD_FAIL);
+        return false;
+    }
+   
+    delay(5);
+    int nLen = 4;
+    unsigned char  cBuff[4] = { 0 };
+    if (m_serial.readChars(cBuff, nLen,100) != nLen)
+    {
+        writeErrorCode(ERROR_ADDR_CMD_FAIL);
+        printf("read  Device Addr failed!\n");
+        m_serial.readData(cBuff, nLen,30) ;
         return false;
     }
 
-    int nLen = 4;
-    unsigned char  cBuff[4] = { 0 };
-    if (m_serial.readData(cBuff, nLen,50) != nLen)
-    {
-        writeErrorCode(ERROR_ADDR_CMD_FAIL);
-        printf("read  Device Addr failed!");
-        return false;
-    }
+     #endif
+
+#if 0
     unsigned char ucSum = (cBuff[0] + cBuff[1] + cBuff[2]);
     
     if (ucSum != cBuff[3])
     {
         writeErrorCode(ERROR_ADDR_CMD_FAIL);
-        printf("CheckSum failed!\n");
+        printf("Device addr CheckSum failed!\n");
         return false;
     }
 
@@ -118,31 +190,28 @@ bool CBase::getDeviceAddrCmd(int &addr)
         m_uDeviceAddr = addr;
         return true;
     }
-    printf("get Device Addr failed!");
+    printf("get Device Addr failed!\r\n");
     writeErrorCode(ERROR_ADDR_CMD_FAIL);
     return false;
+#endif
+   
 }
 
 bool CBase::getDeviceInfoCmd()
 {
-#if defined (_WIN32) || defined(_WIN64)
-    Sleep(2);
-#else 
-    delay(10);
-#endif
-    std::vector<DeviceInfo> ().swap(m_vcDeviceInfo);
-
-    if (m_uDeviceAddr == 0x00)
-    {
-        printf(" no find device,please get device addr \r\n");
-        return false;
-    }
-
-    unsigned char  cData[4] = { 0x55, 0x0B,0x00,0x60 };
-    if (m_serial.writeData2(cData, sizeof(cData)) < 1)
+     unsigned char  cData[4] = { 0x55, 0x0B,0x00,0x60 };
+    if (m_serial.writeData2(cData, sizeof(cData)) < sizeof(cData))
     {
         printf("write getDeviceInfoCmd failed! \r\n");
         writeErrorCode(ERROR_INFO_CMD_FAIL);
+        return false;
+    }
+    return true;
+
+    #if 0
+    unsigned char  buff[255] = { 0 };
+    if(!reviceData(buff, sizeof(stDeviceInfoPkg) * m_uDeviceAddr)){
+         writeErrorCode(ERROR_INFO_CMD_FAIL);
         return false;
     }
 
@@ -150,17 +219,11 @@ bool CBase::getDeviceInfoCmd()
         stDeviceInfoPkg stDeviceInfoTemp;
         memset(&stDeviceInfoTemp, 0, sizeof(stDeviceInfoTemp));
         int nLen = sizeof(stDeviceInfoTemp);
-        unsigned char  cBuff[255] = { 0 };
-        if (m_serial.readData(cBuff, nLen,10) != nLen)
-        {
-            printf("read  getDeviceInfoCmd failed! \r\n");
-            writeErrorCode(ERROR_INFO_CMD_FAIL);
-            return false;
-        }
-        
+        unsigned char  cBuff[100] = { 0 };
+        memcpy(cBuff, buff, nLen);
         if (cBuff[0] == 0x55 && cBuff[1] == 0x0b)
         {
-            memcpy(&stDeviceInfoTemp, cBuff, nLen);
+            memcpy(&stDeviceInfoTemp, cBuff + nLen*i, nLen);
         }
       
         unsigned char ucSum = 0;
@@ -176,7 +239,6 @@ bool CBase::getDeviceInfoCmd()
             return false;
         }
 
-        
         DeviceInfo info;
         //addr
         info.addr = i + 1;
@@ -208,16 +270,101 @@ bool CBase::getDeviceInfoCmd()
         info.firmwareVersion = buf;
         m_vcDeviceInfo.push_back(info);
     }
+#endif
+
+#if 0
+#if defined (_WIN32) || defined(_WIN64)
+    Sleep(2);
+#else 
+    delay(15);
+#endif
+    std::vector<DeviceInfo> ().swap(m_vcDeviceInfo);
+
+    if (m_uDeviceAddr == 0x00)
+    {
+        printf(" no find device,please get device addr \r\n");
+        return false;
+    }
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(15));
+    unsigned char  cData[4] = { 0x55, 0x0B,0x00,0x60 };
+    m_serial.flushReceiver();
+    if (m_serial.writeData2(cData, sizeof(cData)) < 1)
+    {
+        printf("write getDeviceInfoCmd failed! \r\n");
+        writeErrorCode(ERROR_INFO_CMD_FAIL);
+        return false;
+    }
+
+    for (int i = 0; i < m_uDeviceAddr; i++) {
+        stDeviceInfoPkg stDeviceInfoTemp;
+        memset(&stDeviceInfoTemp, 0, sizeof(stDeviceInfoTemp));
+        int nLen = sizeof(stDeviceInfoTemp);
+        unsigned char  cBuff[255] = { 0 };
+        if (m_serial.readChars(cBuff, nLen,100) != nLen)
+        {
+            printf("read  getDeviceInfoCmd failed! \r\n");
+            writeErrorCode(ERROR_INFO_CMD_FAIL);
+            return false;
+        }
+        
+        if (cBuff[0] == 0x55 && cBuff[1] == 0x0b)
+        {
+            memcpy(&stDeviceInfoTemp, cBuff, nLen);
+        }
+      
+        unsigned char ucSum = 0;
+        for (int n = 0; n < nLen - 1; n++)
+        {
+            ucSum += cBuff[n];
+        }
+
+        if (ucSum != stDeviceInfoTemp.ucSum)
+        {
+            writeErrorCode(ERROR_INFO_CMD_FAIL);
+            printf("getDeviceInfoCmd CheckSum failed!\r\n");
+            return false;
+        }
+
+        DeviceInfo info;
+        //addr
+        info.addr = i + 1;
+
+        char buf[128] = {0};
+        //ID 
+        for (int j = 0; j < 8; j++)
+        {
+            sprintf(buf + i, "%c", stDeviceInfoTemp.ucID[i]);
+        }
+        info.deviceID = buf;
+        
+         //
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "%c%c", stDeviceInfoTemp.ucManuInfo[0], stDeviceInfoTemp.ucManuInfo[1]);
+        info.factoryInfo = buf;
+
+        //productName
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "%c%c", stDeviceInfoTemp.ucProductInfo[0], stDeviceInfoTemp.ucProductInfo[1]);
+        info.productName = buf;
+
+        //version
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "%c%c.%c.%c", stDeviceInfoTemp.ucFirmwareVersion[0], 
+            stDeviceInfoTemp.ucFirmwareVersion[1],
+            stDeviceInfoTemp.ucFirmwareVersion[2], 
+            stDeviceInfoTemp.ucFirmwareVersion[3]);
+        info.firmwareVersion = buf;
+        m_vcDeviceInfo.push_back(info);
+    }
+    #endif
     return true;
 }
 
 bool CBase::StartScanCmd()
 {
-#if defined (_WIN32) || defined(_WIN64)
-    Sleep(2);
-#else 
-    delay(2);
-#endif
+    delay(15);
+    std::this_thread::sleep_for(std::chrono::milliseconds(15));
     m_serial.flushReceiver();
     unsigned char  cData[4] = { 0x55, 0x0C, 0x00, 0x61 };
     if (m_serial.writeData2(cData, sizeof(cData)) < 1) 
@@ -225,12 +372,10 @@ bool CBase::StartScanCmd()
         printf("Start ScanCmd failed!");
         return false;
     }
-#if defined (_WIN32) || defined(_WIN64)
-   
-    Sleep(1800);
-#else 
-    delay(1800);
-#endif
+
+    m_thread_enable = false;
+    delay(100);
+    
     m_bStart = true;
     m_thread_enable = true;
     m_serial.flushReceiver();
@@ -242,8 +387,9 @@ bool CBase::StartScanCmd()
     //std::thread thParasePkg(&CBase::ThreadParsePkg, this);
     //thParasePkg.detach();
 #else
-    std::thread thRun(&CBase::ThreadRun, this);
-    thRun.detach();
+    //m_threadRun = std::thread(&CBase::ThreadRun, this);
+    std::thread threadStart(&CBase::ThreadRun, this);
+    threadStart.detach();
 #endif
 
     
@@ -254,41 +400,57 @@ bool CBase::StartScanCmd()
 
 bool CBase::StopScanCmd()
 {
-    m_thread_enable = false;
-    int nCount = 0;
     clearPointBuffer();
     clearErrorCoed();
 
+    unsigned char  cData[] = { 0x55, 0x0D, 0x00, 0x62 }; 
+    if(m_serial.writeData2(cData, sizeof(cData)) != sizeof(cData)){
+        writeErrorCode(ERROR_STOPSCAN_CMD_FAIL);
+        return false;
+    }
+    delay(100);
+    #if 0
+    if(m_serial.writeData2(cData, sizeof(cData)) != sizeof(cData)){
+        writeErrorCode(ERROR_STOPSCAN_CMD_FAIL);
+        return false;
+    }
+    #endif
+    return true;
+#if 0
+    memset(cData, 0, sizeof(cData));
+    delay(5);
+    if(!reviceData(cData, 4)){
+        return false;
+    }
+    if(cData[0] == 0x55 && 0x0D == cData[1] ){
+        return true;
+    }
+
+    return false;
+    #endif
+
+#if 0
     while (nCount < 5)
     {
         nCount++;
         m_serial.flushReceiver();
-
 #ifdef __linux__
         delay(5);
 #else
         Sleep(5);
-#endif
-       
+#endif 
         printf("nCountT: %d\r\n", nCount);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
         unsigned char  cData[4] = { 0x55, 0x0D, 0x00, 0x62 };
         if (m_serial.writeData2(cData, sizeof(cData)) < 1)
         {
-            #if defined (_WIN32) || defined(_WIN64)
-            Sleep(5);
-            #else 
-                delay(5);
-            #endif
-               printf("stop cmd failed \n");
+            delay(10);
+            printf("stop cmd failed \n");
             continue;
         }
         m_serial.flushReceiver();
 
-#ifdef __linux__
-        delay(100);
-#else
-        Sleep(100);
-#endif
+        std::this_thread::sleep_for(std::chrono::milliseconds(5));
         int nLen = 2;
         double dBigen = m_serial.GetTimeStamp() / 1.0e6;
         std::vector<unsigned char> veTemp;
@@ -302,7 +464,7 @@ bool CBase::StopScanCmd()
                     unsigned char ucSum = (veTemp[veTemp.size() - 4] + veTemp[veTemp.size() - 3] + veTemp[veTemp.size() - 2]);
                     if (ucSum != veTemp[veTemp.size() - 1])
                     {
-                        printf("CheckSum failed! 1\n");
+                        //printf("CheckSum failed! 1\n");
                         //return false;
                         break;
                     }
@@ -321,7 +483,7 @@ bool CBase::StopScanCmd()
             }
 
             double dEnd = m_serial.GetTimeStamp() / 1.0e6;
-            if (dEnd - dBigen > 1000)
+            if (dEnd - dBigen > 500)
             {
                 printf("read  Stop cmd timeout!\n");
                 break;
@@ -332,6 +494,7 @@ bool CBase::StopScanCmd()
     }
 
     return false;
+    #endif
 }
 
 void CBase::getFps(float &fps)
@@ -477,6 +640,114 @@ UINT64 CBase::getCurrentTimestampUs()
 {
     auto ts = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     return ts;
+}
+
+
+void CBase::eraseBuff(std::vector<unsigned char> &lstG, int iLen)
+{
+    if (lstG.size() >= iLen)
+		lstG.erase(lstG.begin(), lstG.begin() + iLen);
+	else
+		lstG.clear();
+
+    {
+         std::vector<UCHAR> tmp = lstG;
+         lstG.swap(tmp);
+    }
+}
+
+bool CBase::reviceStop(std::vector<unsigned char> &lstData)
+{
+    if(lstData.size() < 4){
+        return false;
+    } 
+    unsigned char uSum = 0x00;
+    uSum = lstData[0] + lstData[1] + lstData[2];
+    
+    return (uSum == lstData[3]) ? true : false; ;
+}
+
+bool CBase::reviceAddr(std::vector<unsigned char> &lstData)
+{
+     if(lstData.size() < 4){
+        return false;
+    } 
+    unsigned char uSum = 0x00;
+    uSum = lstData[0] + lstData[1] + lstData[2];
+    if(uSum == lstData[3]){
+          m_uDeviceAddr = lstData[2];
+          printf("add:%d\n",m_uDeviceAddr );
+          return true;
+    }
+
+    return  false; 
+}
+
+bool CBase::reviceDeviceInfo(std::vector<unsigned char> &lstData)
+{
+        stDeviceInfoPkg stDeviceInfoTemp;
+        memset(&stDeviceInfoTemp, 0, sizeof(stDeviceInfoTemp));
+        int nLen = sizeof(stDeviceInfoTemp);
+        if(lstData.size()  < nLen) {
+            return false;
+        }
+
+        memcpy(&stDeviceInfoTemp, &lstData[0], nLen);
+    
+        unsigned char ucSum = 0;
+        for (int n = 0; n < nLen - 1; n++)
+        {
+            ucSum += lstData[n];
+        }
+
+        eraseBuff(lstData, nLen);
+
+        if (ucSum != stDeviceInfoTemp.ucSum)
+        {
+            writeErrorCode(ERROR_INFO_CMD_FAIL);
+            printf("getDeviceInfoCmd CheckSum failed!\r\n");
+            return false;
+        }
+
+         if(stDeviceInfoTemp.ucAddr > 0 && stDeviceInfoTemp.ucAddr <4){
+            m_arrDeviceInfo[stDeviceInfoTemp.ucAddr- 1] = stDeviceInfoTemp;
+        }
+
+#if 0 
+        DeviceInfo info;
+        //addr
+        info.addr = stDeviceInfoTemp.ucAddr;
+
+        char buf[128] = {0};
+        //ID 
+        for (int j = 0; j < 8; j++)
+        {
+            sprintf(buf, "%c", stDeviceInfoTemp.ucID[j]);
+        }
+        info.deviceID = buf;
+        
+         //
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "%c%c", stDeviceInfoTemp.ucManuInfo[0], stDeviceInfoTemp.ucManuInfo[1]);
+        info.factoryInfo = buf;
+
+        //productName
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "%c%c", stDeviceInfoTemp.ucProductInfo[0], stDeviceInfoTemp.ucProductInfo[1]);
+        info.productName = buf;
+
+        //version
+        memset(buf, 0, sizeof(buf));
+        sprintf(buf, "%c%c.%c.%c", stDeviceInfoTemp.ucFirmwareVersion[0], 
+            stDeviceInfoTemp.ucFirmwareVersion[1],
+            stDeviceInfoTemp.ucFirmwareVersion[2], 
+            stDeviceInfoTemp.ucFirmwareVersion[3]);
+        info.firmwareVersion = buf;
+        if(info.addr > 0 && info.addr <4){
+            m_arrDeviceInfo[info.addr - 1] = info;
+        }
+        #endif
+    return true;
 }
 
 void CBase::ThreadRun()
@@ -848,4 +1119,87 @@ int CBase::ParasePkg(PKGDATA &data)
         }
      };
      return 0;
+}
+
+void CBase::ThreadCmd()
+{
+    m_thread_enable = true;
+    unsigned char unBuff [256]= {0x00};
+    while (m_thread_enable)
+    {
+        memset(unBuff, 0 , sizeof(unBuff));
+        int iRC = m_serial.readData(unBuff, sizeof(unBuff), 30);
+        if(iRC < 1){
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		    std::this_thread::yield();
+            continue;
+        }else{
+            std::lock_guard<std::mutex> lock(m_mtxBuff);
+            for (int i = 0; i < iRC; i++)
+            {
+                m_lstTemp.push_back(unBuff[i]);
+            }
+        }
+    };
+    
+}
+
+void CBase::ThreadParse()
+{
+    while (m_thread_enable)
+    {
+            std::lock_guard<std::mutex> lock(m_mtxBuff);
+            if(m_lstTemp.size()>0)
+            {
+                std::vector<UCHAR>  lstTemp;
+                lstTemp.swap(m_lstTemp);
+                m_lstBuff.insert(m_lstBuff.end(), lstTemp.begin(), lstTemp.end());
+            }   
+
+            int cmd_step = eInit;
+            unsigned char tmep = 0x00;
+            int index = -1;
+            int nCount = m_lstBuff.size();
+            for(int i = 0; i < nCount -1;i++)
+            {
+                if(m_lstBuff[i] == HEAD && m_lstBuff[i + 1] == ADDR ){
+                    cmd_step = eGetAddr;
+                    index = i;
+                    break;
+                }else if(m_lstBuff[i] == HEAD && m_lstBuff[i + 1] == DEVICE ){
+                    cmd_step = eGetInfo;
+                    index = i;
+                    break;
+                }else if(m_lstBuff[i] == HEAD && m_lstBuff[i + 1] == STOP ){
+                    cmd_step = eScanStop;
+                    index = i;
+                    break;
+                }
+            }
+
+            if(index >= 0 )
+            {
+                    eraseBuff(m_lstBuff,index);
+                    switch (cmd_step)
+                    {
+                    case eScanStop:
+                        printf("stop recive\n");
+                        eraseBuff(m_lstBuff,4);
+                        reviceStop(m_lstBuff);
+                        break;
+                    case eGetAddr:
+                         printf("addr recive\n");
+                        reviceAddr(m_lstBuff);
+                        eraseBuff(m_lstBuff,4);
+                        break;
+                    case eGetInfo:
+                        reviceDeviceInfo(m_lstBuff);
+                        printf("addr eGetInfo\n");
+                        break;
+                    }
+            }else
+            {
+                continue; ;
+            }
+    };
 }
