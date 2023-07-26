@@ -5,7 +5,7 @@
 @FileName: l2_sdk.cpp
 @Author:
 @ Date: 2023-05-05
-@Description:  L2 SDK api借口
+@Description:  L2 SDK api接口
 @Version: V1.0.1
 @History: 历史修改记录
 <author> <time> <version > <desc>

@@ -1,3 +1,13 @@
+
+/* *****************************************************************
+ * @File_Name   :   data_struct.h
+ * @Auth0r      :   yzb
+ * @Email       :   zb.yin@camsense.cn
+ * @Data        :   2023-05-29 
+ * @Copyright   :   CAMSENSE. All rights reserved
+ * @Description :   结构体数据文件
+ * @Brief       :
+ ******************************************************************/
 #ifndef      __DATA_STRUCT_H
 #define     __DATA_STRUCT_H
 #include<string>

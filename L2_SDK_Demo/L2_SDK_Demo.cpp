@@ -8,15 +8,21 @@
 
 #ifdef __linux__
 #include <unistd.h>
+#else
+#include <windows.h>
 #endif
 
 using namespace std;
 
-#ifdef __linux__
+
 static void delay(UINT32 ms) {
-		if(ms != 0){usleep(ms * 1000);}
-}
+#ifdef __linux__
+	if(ms != 0){usleep(ms * 1000);}
+#else 
+	Sleep(ms);
 #endif
+}
+
 
 static void savedata(std::vector<stOutputPoint>& data)
 {
