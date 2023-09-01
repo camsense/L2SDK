@@ -38,17 +38,17 @@ typedef unsigned int                                 UINT32;
 
 
 typedef struct _deviceInfo{
-    UINT8 addr;                                                     //设备地址
+    UINT8 addr;                                             //设备地址
     std::string factoryInfo;                                //厂家信息
-    std::string productName;                          //产品名称    
-    std::string firmwareVersion;                     //固件版本号 
-    std::string deviceID;                                    //设备ID 号 
+    std::string productName;                                //产品名称    
+    std::string firmwareVersion;                            //固件版本号 
+    std::string deviceSN;                                   //设备SN 号 
     void  DeviceInfo() {
         addr = 0;
         factoryInfo.clear();
         productName.clear();
         firmwareVersion.clear();
-        deviceID.clear();
+        deviceSN.clear();
     }
 }DeviceInfo;
 

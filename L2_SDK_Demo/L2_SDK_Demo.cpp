@@ -89,8 +89,8 @@ int main()
 		return 0;
 	}
 	for(auto it:info){
-		printf("add:%d, factoryInfo:%s,firmwareVersion:%s, productName:%s, id:%s\r\n",
-		it.addr, it.factoryInfo.c_str(), it.firmwareVersion.c_str(),it.productName.c_str(), it.deviceID.c_str());
+		printf("add:%d, factoryInfo:%s,firmwareVersion:%s, productName:%s, SN:%s\r\n",
+		it.addr, it.factoryInfo.c_str(), it.firmwareVersion.c_str(),it.productName.c_str(), it.deviceSN.c_str());
 	}
 
 	cout << "get device info  fanish!" << endl;

@@ -77,11 +77,11 @@ bool CBase::init(const char *chPort, int iBaute)
 
         char buf[128] = {0};
         //ID 
-        for (int j = 0; j < 8; j++)
+        for (int j = 0; j < 15; j++)
         {
-            sprintf(buf, "%c", stDeviceInfoTemp.ucID[j]);
+            sprintf(&buf[j], "%c", stDeviceInfoTemp.ucSN[j]);
         }
-        info.deviceID = buf;
+        info.deviceSN = buf;
         
          //
         memset(buf, 0, sizeof(buf));

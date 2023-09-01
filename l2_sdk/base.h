@@ -51,7 +51,7 @@ typedef struct _DeviceInfoPkg {
     unsigned char ucManuInfo[2];		//厂家信息
     unsigned char ucProductInfo[4];		//产品信息
     unsigned char ucFirmwareVersion[4];	//固件版本号V1.0.1；
-    unsigned char ucID[8];				//固件ID
+    unsigned char ucSN[32];				//固件SN
     unsigned char ucReserve[4];			//预留
     unsigned char ucSum;				//校验和
 }stDeviceInfoPkg;

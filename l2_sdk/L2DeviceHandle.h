@@ -18,9 +18,9 @@ public:
     bool starScanDevice();                                                  //开始扫描
     bool stopScanDevice();                                                  //停止扫描
     void getFps(float& fps);
-    void getPointData(std::vector<stOutputPoint>& data);
-    void getErrorCode(ErrorCode& error);
-    bool getInfo(std::vector<DeviceInfo>& info);
+    void getPointData(std::vector<stOutputPoint>& data);                    //获取点云
+    void getErrorCode(ErrorCode& error);                                    //获取错误码
+    bool getInfo(std::vector<DeviceInfo>& info);                            //获取设备信息
     
 
 protected:
@@ -28,7 +28,7 @@ protected:
     CBase m_pBase;
 
 private:
-    std::string m_strSdkVersion = "V1.0.3";
+    std::string m_strSdkVersion = "V1.0.4";
 
 };
 
