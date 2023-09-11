@@ -18,6 +18,7 @@ char* CL2DeviceHandle::getSDKVersion(){
 
 UINT8 CL2DeviceHandle::getNumberOfDevice()
 {
+    m_pBase.configDevices();
     return m_pBase.getDeviceNum();
 }
 
@@ -50,6 +51,21 @@ void CL2DeviceHandle::getErrorCode(ErrorCode& error)
 bool CL2DeviceHandle::getInfo(std::vector<DeviceInfo>& info)
 {
     return m_pBase.getDeviceInfo(info);
+}
+
+int CL2DeviceHandle::upgradeBin(const char* path, const UINT8 addr)
+{
+    return m_pBase.upgradeBin(path, addr);
+}
+
+void CL2DeviceHandle::getUpgradeProgress(float& percentage)
+{
+    m_pBase.getProgress(percentage);
+}
+
+bool CL2DeviceHandle::sendTimeStamp(const unsigned int ms)
+{
+   return m_pBase.sendTimeStamp(ms);
 }
 
 bool CL2DeviceHandle::init(const char *chPort,  int iBaud)

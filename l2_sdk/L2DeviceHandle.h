@@ -22,13 +22,18 @@ public:
     void getErrorCode(ErrorCode& error);                                    //获取错误码
     bool getInfo(std::vector<DeviceInfo>& info);                            //获取设备信息
     
+    //升级
+    int upgradeBin(const char* path, const UINT8 addr);
+    void getUpgradeProgress(float& percentage);
+
+    bool sendTimeStamp(const unsigned int ms);
 
 protected:
 	CL2DeviceHandle();
     CBase m_pBase;
 
 private:
-    std::string m_strSdkVersion = "V1.0.4";
+    std::string m_strSdkVersion = "V1.0.5";
 
 };
 

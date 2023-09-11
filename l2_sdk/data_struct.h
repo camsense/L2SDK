@@ -31,10 +31,10 @@
 typedef unsigned char                           UINT8;
 typedef unsigned char                           UCHAR;
 typedef unsigned short                          UINT16;
-typedef unsigned int                                UINT;
-typedef unsigned long                              ULONG;
-typedef unsigned long long int            UINT64;  
-typedef unsigned int                                 UINT32;
+typedef unsigned int                            UINT;
+typedef unsigned long                           ULONG;
+typedef unsigned long long int                  UINT64;  
+typedef unsigned int                            UINT32;
 
 
 typedef struct _deviceInfo{
@@ -53,16 +53,21 @@ typedef struct _deviceInfo{
 }DeviceInfo;
 
 typedef struct _PointData{
-    bool bflag;                                  //是否有效： true - 有效   0 - 无效
-    float x;                
-    float y;
+    bool bflag;                                  //是否有效： true - 有效   false - 无效
+    bool bfiter;                                 //是否滤波:  true - 是     false - 否
+    float x;                                     //x坐标
+    float y;                                     //y坐标
+    unsigned char quality;                       //亮度信息
+    UINT8 row;                           //每个激光点所在的行
 }POINTDATA;
 
 typedef struct _OutputPoint
 {
-    UINT64 u64TimeStampS;
-    UINT8 uaddr;
-    std::vector<POINTDATA> Point;
+    UINT64 u64LocTimeStampS;                        //本地解析数据的时间戳
+    UINT64 u64DeviceTimeStampS;                     //设备的时间戳
+    UINT64 u64ExposureTimeStamp;                    //每帧开始曝光的时间戳
+    UINT8 uaddr;                                    //设备地址
+    std::vector<POINTDATA> Point;                   //一帧的点云数据
 }stOutputPoint;
 
 
@@ -72,12 +77,16 @@ typedef struct _OutputPoint
     ERROR_INIT_FAIL = -1000,                            //init失败
     ERROR_OPEN_SERIAL_FAIL ,                            //open com failed
     ERROR_ADDR_CMD_FAIL,                                //获取地址命令失败
-    ERROR_INFO_CMD_FAIL,                                    //获取设备信息命令失败
+    ERROR_INFO_CMD_FAIL,                                //获取设备信息命令失败
     ERROR_STARTSCAN_CMD_FAIL,                           //开始扫描命令失败     
     ERROR_STOPSCAN_CMD_FAIL,                            //停止扫描命令失败
-    ERROR_NOT_DATA,                                             //设备无数据
+    ERROR_NOT_DATA,                                     //设备无数据
     ERROR_CHECKSUM_FAIL,                                //校验和失败
 
+    ERROR_UPDATE_CHECKSUM,                              //升级数据包校验和错误
+    ERROR_UPDATE_FILTER,                                //升级的固件不匹配
+    ERROR_UPDATE_SEQ,                                   //升级顺序错误
+    ERROR_UPDATE_FW_CHECKSUM                            //固件校验和错误
 };
 
 #endif

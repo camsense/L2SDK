@@ -40,6 +40,12 @@ extern "C" {
     void apiGetPointData(std::vector<stOutputPoint>& point);
     //获取错误码
     void apiGetErrorCode(ErrorCode& code);
+    //升级固件bin
+    int apiUpgradeBin(const char* path, const UINT8 addr);
+    //获取固件升级进度
+    void apiGetUpgradeProgress(float& percentage);
+    //发送时间戳同步
+    bool apiSendTimeStamp(const unsigned int ms);
 
 #ifdef __cplusplus
 };

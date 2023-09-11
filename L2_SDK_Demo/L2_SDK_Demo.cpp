@@ -32,19 +32,47 @@ static void savedata(std::vector<stOutputPoint>& data)
         std::ofstream in(file, std::ios::app);
         std::vector<POINTDATA> vcPoint;
         vcPoint.swap(it.Point);
-		UINT64 time = it.u64TimeStampS;
+		UINT64 time = it.u64LocTimeStampS;
         for (auto p : vcPoint)
         {
-            in << time <<","<<p.bflag << "," << p.x << "," << p.y << endl;
+            int quality = p.quality;
+            int row = p.row;
+            in << it.u64LocTimeStampS << "," << it.u64DeviceTimeStampS << "," << it.u64ExposureTimeStamp <<","<<p.bflag << "," << p.bfiter << ","
+                << p.x << "," << p.y << "," << quality << ","<< row << endl;
         }
         in.close();
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
+static float g_fPercentage = 0x00;
+static bool g_bEnable = false;
+void showProcess(float temp ) {
+    while (!g_bEnable)
+    {
+        float temp = 0;
+        apiGetUpgradeProgress(temp);
+        if (g_fPercentage != temp)
+        {
+            std::cout << "升级进度:" << temp <<"%" << endl;
+            g_fPercentage = temp;
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+   
+}
+
 int main()
 {
 	cout << "camsense L2 sdk" << endl;
+    cout << "-------------------------------------" << endl;
+    cout << " 1、启动设备 " << endl;
+    cout << " 2、升级设备 " << endl;
+    cout << "-------------------------------------" << endl;
+    cout << " 请输入: " << endl;
+    int type = 1;
+    std::cin >> type;
+
 	std::string strVersion = apiGetVersion();
 	cout << "sdk version: "<< strVersion << endl;
 
@@ -66,93 +94,97 @@ int main()
 	}
 	cout << "camsense L2 sdk init fanish!" << endl;
 
-	int nAddr = apiGetDeviceAddr();
+    if (type == 2) {
+        g_bEnable = false;
+        std::string strPath;
+        int addr = 0x00;
+        std::cout << "请输入升级文件路径+文件名:" << endl;
+        std::cin >> strPath;
+        std::cout << "请输入升级设备的地址:" << endl;
+        std::cin >> addr;
+        float temp = 0;
+        std::thread thProcess(showProcess, temp);
+        thProcess.detach();
 
-	if(nAddr  == 0){
-		cout << "apiGetDeviceAddr fail!" << endl;
-		apiSDKUninit();
-		return 0;
-	}
-		cout << "max addr:" << nAddr << endl;
+        int iRes = apiUpgradeBin(strPath.c_str(), addr);
+        if (iRes < 0)
+        {
+            std::cout << "升级失败：" << iRes << endl;
+        }
+        else
+        {
+            std::cout << "升级成功！" << endl;
+        }
 
-	for(int i = 1; i <= nAddr; i++){
-		std::string file = "addr" + std::to_string(i) + ".csv";
-        std::ofstream in(file);
-		in << "time,是否有效,x,y"<<endl;
-		in.close();
-	}
-	    
-	std::vector<DeviceInfo> info;
-	if (!apiGetDeviceInfo(info))
-	{
-		cout << "get device info failed"  << endl;
-		return 0;
-	}
-	for(auto it:info){
-		printf("add:%d, factoryInfo:%s,firmwareVersion:%s, productName:%s, SN:%s\r\n",
-		it.addr, it.factoryInfo.c_str(), it.firmwareVersion.c_str(),it.productName.c_str(), it.deviceSN.c_str());
-	}
+        g_bEnable = true;
 
-	cout << "get device info  fanish!" << endl;
+        while (1)
+        {
+            delay(10);
+        }
+    }
+    else if(type == 1){
 
-	delay(15);
+        int nAddr = apiGetDeviceAddr();
+        if (nAddr == 0) {
+            cout << "apiGetDeviceAddr fail!" << endl;
+            apiSDKUninit();
+            return 0;
+        }
+        cout << "max addr:" << nAddr << endl;
 
-	if (!apiStartScan()) {
-        cout << "device scan failed!" << endl;
-		apiSDKUninit();
-        return 0;
-	}
-	cout << "device scan fanish!" << endl;
+        for (int i = 1; i <= nAddr; i++) {
+            std::string file = "addr" + std::to_string(i) + ".csv";
+            std::ofstream in(file);
+            in << "loctime,devicetime,Exptime,是否有效,是否滤波,x,y,亮度信息,row" << endl;
+            in.close();
+        }
 
-	int nTestCount = 1;
-	while (nTestCount++ < 10000){
-		std::vector<stOutputPoint> data;
-		apiGetPointData(data);
-		if(data.size() >0 ){
-			savedata(data);
-			float fps  = 0;
-			apiGetDeviceFps(fps);
-			std::cout << "fps: " << fps <<endl;
-		}
-		else{
-			ErrorCode error;
-			apiGetErrorCode(error);
-			if (error != IDLE )
-			{
-				cout << "error: " << error << endl;
-			}
-		}
-		
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        std::this_thread::yield();
-	};
+        std::vector<DeviceInfo> info;
+        if (!apiGetDeviceInfo(info))
+        {
+            cout << "get device info failed" << endl;
+            return 0;
+        }
 
-	apiStopScan();
-	delay(2000);
-	apiStartScan();
-	nTestCount = 0;
-	while (nTestCount++ <= 10000){
-		std::vector<stOutputPoint> data;
-		apiGetPointData(data);
-		if(data.size() >0 ){
-			savedata(data);
-			float fps  = 0;
-			apiGetDeviceFps(fps);
-			std::cout << "fps: " << fps <<endl;
-		}
-		else{
-			ErrorCode error;
-			apiGetErrorCode(error);
-			if (error != IDLE )
-			{
-				cout << "error: " << error << endl;
-			}
-		}
-		
-		std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        std::this_thread::yield();
-	};
-	
+        for (auto it : info) {
+            printf("add:%d, factoryInfo:%s,firmwareVersion:%s, productName:%s, SN:%s\r\n",
+                it.addr, it.factoryInfo.c_str(), it.firmwareVersion.c_str(), it.productName.c_str(), it.deviceSN.c_str());
+        }
+
+        cout << "get device info  fanish!" << endl;
+        delay(15);
+
+        if (!apiStartScan()) {
+            cout << "device scan failed!" << endl;
+            apiSDKUninit();
+            return 0;
+        }
+        cout << "device scan fanish!" << endl;
+
+        int nTestCount = 1;
+        while (nTestCount) {
+            std::vector<stOutputPoint> data;
+            apiGetPointData(data);
+            if (data.size() > 0) {
+                savedata(data);
+                float fps = 0;
+                apiGetDeviceFps(fps);
+                std::cout << "fps: " << fps << endl;
+            }
+            else {
+                ErrorCode error;
+                apiGetErrorCode(error);
+                if (error != IDLE)
+                {
+                    cout << "error: " << error << endl;
+                }
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::yield();
+        };
+    }
 
 	cout << "exit out!" << endl;
 	delay(10);

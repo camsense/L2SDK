@@ -143,6 +143,56 @@ extern "C" {
 		CL2DeviceHandle::Instance().getErrorCode(code);
 	}
 
+    /*************************************************
+    @Function: 				apiUpgradeBin()
+    @Description: 			升级固件
+    @Input:					path - 文件路径+文件名
+                            addr - 设备地址
+    @Output:  				nothing
+    @Return:
+                    0 - 升级成功
+                    -1 - 输入的地址错误
+                    -2 - 串口发送命令失败
+                    -3 - 读取bin文件大小失败
+                    -4 - 读取bin文件数据失败
+                    -5 - 升级开始步骤失败
+                    -6 - 升级数据开始步骤失败
+                    -7 - 升级数据包步骤失败
+                    -8 - 升级数据结束步骤失败
+                    -9 - 升级校验重启失败
+    @Others:
+    *************************************************/
+    int apiUpgradeBin(const char* path, const UINT8 addr)
+    {
+        return CL2DeviceHandle::Instance().upgradeBin(path, addr);
+    }
+
+    /*************************************************
+    @Function: 				apiGetUpgradeProgress()
+    @Description: 			获取升级进度
+    @Input:					nothing
+    @Output:  				percentage - 升级进度百分比
+    @Return: 				nothing
+    @Others:
+    *************************************************/
+    void apiGetUpgradeProgress(float& percentage)
+    {
+        CL2DeviceHandle::Instance().getUpgradeProgress(percentage);
+    }
+
+    /*************************************************
+    @Function: 				apiSendTimeSamp()
+    @Description: 			发送时间戳同步
+    @Input:					ms - 时间戳， 单位毫秒
+    @Output:  				nothing
+    @Return: 				false - 失败  true - 成功
+    @Others:
+    *************************************************/
+    bool apiSendTimeStamp(const unsigned int ms)
+    {
+        return CL2DeviceHandle::Instance().sendTimeStamp(ms);
+    }
+
 #ifdef __cplusplus
 };
 #endif

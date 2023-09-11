@@ -614,6 +614,9 @@ void HC_serial::flushReceiver()
 {
 #ifdef __linux__
     tcflush(m_fd, TCIOFLUSH);//tcflush(m_fd,TCIFLUSH);//tcflush(m_fd, TCIOFLUSH);
+#else
+    /** 清空串口缓冲区 */
+    PurgeComm(hSerial, PURGE_RXCLEAR | PURGE_RXABORT);
 #endif
 }
 

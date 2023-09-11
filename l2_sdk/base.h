@@ -20,28 +20,63 @@
 
 #define HEAD                0x55
 #define ADDR                0x0a
-#define DEVICE             0x0b
+#define DEVICE              0x0b
 #define START               0x0c
-#define STOP                 0x0d
+#define STOP                0x0d
 
 #define MAX_LEN 968 * 10
-enum DistPkgEmun { eDist55 , eDistAA, eDistCount, eDistData, eDistSum};
+enum DistPkgEmun {
+    eTimeHead0 = 0,
+    eTimeHead1,
+    eTimeData,
+    eTimeSum,
+    eDataPkg,
+    eDataEnd,
+};
 enum CmdEmun{eInit, eGetAddr, eGetInfo, eScanStop};
 
 #pragma pack(1)
 typedef struct _Point2D{
+#if 0
     int x;   
-    unsigned short y;   
+    unsigned short y;  
+#else
+    short x : 14;                       //x坐标，单位0.1mm，有符号
+    unsigned short flag : 1;            //有效标志位
+    unsigned short fiter : 1;           //过滤标志位
+    unsigned short y : 12;              //y坐标，单位0.1mm，无符号
+    unsigned short reserve : 4;         //保留位
+    unsigned char quality : 8;          //亮度信息
+    UINT8 row : 8;                      //行
+#endif
 } Point2D;
 
 typedef struct _PckData {
+#if 0
     unsigned short usHD;
 	unsigned char ucAD;
 	unsigned char ucDN;
 	Point2D data[160];
     unsigned short usVP;
     unsigned short checksum;
+#else
+    unsigned short usHead;      //包头
+    unsigned char ucAddr;       //地址
+    unsigned char param_h;      //参数H
+    unsigned int u64Ms;         //时间戳
+    Point2D data[160];          //点云数据
+    unsigned char param_v;      //参数V
+    unsigned char param_e;      //参数e
+    unsigned short usCheckSum;  //校验和
+#endif
 } PKGDATA;
+
+//时间同步
+typedef struct {
+    unsigned short usHead : 16;          //包头
+    unsigned int usMs : 32;              //毫秒时间戳
+    unsigned short checksum : 16;        //包校验和
+}TIMEPKG;
 
 //设备信息pack
 typedef struct _DeviceInfoPkg {
@@ -56,8 +91,53 @@ typedef struct _DeviceInfoPkg {
     unsigned char ucSum;				//校验和
 }stDeviceInfoPkg;
 
+
+
 #pragma pack()
 
+#define MAGIC_GD_L2			    0x324C4447// GDL2
+#define UPGRDE_HEAD_PKG0        0x55 
+#define UPGRDE_HEAD_PKG1        0x0E
+#define TIME_HEAD_PKG0          0x55 
+#define TIME_HEAD_PKG1          0x0F
+#define POINT_HEAD_PKG0         0x55 
+#define POINT_HEAD_PKG1         0xAA
+
+
+//cmd
+enum {
+    UPDATE_CMD_START = 0,           //开始升级
+    UPDATE_CMD_DATA_START,          //开始升级数据
+    UPDATE_CMD_DATA,                //升级数据
+    UPDATE_CMD_DATA_END,            //升级数据结束
+    UPDATE_CMD_REBOOT,              //重启
+};
+
+//head
+typedef struct {
+    unsigned short head;// 0x0E55
+    UINT8 id : 2;
+    UINT8 err : 3;
+    UINT8 update_cmd : 3;
+    UINT8 seq_k;
+} update_head;
+
+//发送以及接受命令包结构
+typedef struct {
+    update_head pkg_head;               //包头
+    unsigned int filter;                //升级匹配标准
+    unsigned int descriptor;            //升级描述标准
+    unsigned short fw_checksum;         //固件校验和
+    unsigned short pck_checksum;        //包校验和
+}UPGRDE_FARMWARE_PKG;
+
+//数据发送命令包结构
+typedef struct {
+    update_head pkg_head;               //包头
+    unsigned short valid_len;           //数据长度
+    unsigned char data[1024];           //数据
+    unsigned short pck_checksum;        //包校验和
+}UPGRDE_DATA_PKG;
 
 
 class CBase{
@@ -65,23 +145,37 @@ public:
     CBase(void);
     ~CBase(void);
 
-    bool init(const char *chPort,  int iBaute);             //初始化
-    bool uninit();                                                                      //释放
+    bool init(const char *chPort,  int iBaute);                             //初始化
+    bool uninit();                                                          //释放
+    bool configDevices();                                                   //配置设备
 
-    bool  getDeviceAddrCmd();                      //获取设备地址cmd
-    bool  getDeviceInfoCmd();                                           //获取设备信息cmd
-    bool  StartScanCmd();                                                   // 开始扫描cmd
+    bool  getDeviceAddrCmd();                                               //获取设备地址cmd
+    bool  getDeviceInfoCmd();                                               //获取设备信息cmd
+    bool  StartScanCmd();                                                   //开始扫描cmd
     bool  StopScanCmd();                                                    //停止扫描cmd   
 
-    void getFps(float& fps);                                                        //获取帧率
-    UINT8 getDeviceAddr();                                                      //获取设备地址
-    UINT8 getDeviceNum();                                                       //获取设备个数
+    void getFps(float& fps);                                                //获取帧率
+    UINT8 getDeviceAddr();                                                  //获取设备地址
+    UINT8 getDeviceNum();                                                   //获取设备个数
     int getPointData(std::vector<stOutputPoint> & point, int len);
-    ErrorCode getErrorCode();                                                   //获取错误码
-    bool getDeviceInfo(std::vector<DeviceInfo>& info);  //获取设备信息
-    inline void setEnable(bool res){
+    ErrorCode getErrorCode();                                               //获取错误码
+    bool getDeviceInfo(std::vector<DeviceInfo>& info);                      //获取设备信息
+    inline void setEnable(bool res){                        
             m_thread_enable = res;
     }
+
+    int upgradeBin(const char* path, const UINT8 addr);                     //升级bin文件
+    void setProgress(float percentage) {                                    //设置升级进度
+        std::unique_lock<std::mutex> uclk(m_mutProgress);
+        m_fProgress = percentage;
+    }
+
+    void getProgress(float& percentage) {                                   //获取升级进度
+        std::unique_lock<std::mutex> uclk(m_mutProgress);
+        percentage = m_fProgress;
+    }
+
+    bool sendTimeStamp(const unsigned int ms);                             //设置时间戳同步
 
 protected:
     HC_serial m_serial;
@@ -122,37 +216,71 @@ protected:
 
 
 private:
-    void ThreadRun();                                                                   //运行采集数据并解析点云数据
-    int ParsePackData(PKGDATA& Data);                              //解析数据
-    bool CheckSum(unsigned char *buff, int len);           //校验和
-    void ThreadRead();                                                                  //队列的方式采集数据
-    void ThreadParsePkg();                                                          //从队列中读取数据并解析
-    int ParasePkg(PKGDATA& data);                                         //解析队列中的数据
+    void ThreadRun();                                              //运行采集数据并解析点云数据
+    int ParsePackData(PKGDATA& Data, TIMEPKG& time);                              //解析数据
+    bool CheckSum(unsigned char *buff, int len);                   //校验和
+    void ThreadRead();                                             //队列的方式采集数据
+    void ThreadParsePkg();                                         //从队列中读取数据并解析
+    int ParasePkg(PKGDATA& data);                                  //解析队列中的数据
     void ThreadCmd();
     void ThreadParse();
+
+    void readDataThread();
+    void parseDataThread();
+    bool parseTime(std::vector<unsigned char> &lstData);
+    bool ParsePointData(std::vector<unsigned char> &lstData);
+
+    void ThreadUpgradeRun();                                        //启动升级数据接收线程
+    void readUpgradeThead();                                        //读取升级应答数据线程
+    void parseUpgradeThead();                                       //解析升级应答指令线程
+    bool parseUpgradeData(std::vector<unsigned char> &lstData);     // 解析应答指令函数
+    void UpgradeUninit();                                           //退出升级
+
+     //升级
+    bool getBinSize(const char* path, unsigned int& size);                       //获取bin文件大小
+    bool getBinData(const char* path, unsigned char* data, unsigned int size);   //获取bin文件数据
+      //升级指令
+    bool upgradeStart(const UINT8 addr);                                                                    //升级开始
+    bool upgradeDataStart(const UINT8 addr);                                                                //升级数据开始
+    bool upgradeData(const UINT8 addr, unsigned char data[], const unsigned short len, UINT8 uIndex);       //升级数据 包
+    bool upgradeDataEnd(const UINT8 addr, unsigned char data[], const unsigned short len, UINT8 uIndex);    //升级结束
+    bool upgradeReset(const UINT8 addr, const unsigned short FW_checksum);                                  //校验重启
+
 
     std::thread m_threadCmd ;
     std::thread m_threadParse;
     //std::thread m_threadRun;
 
     UINT8 m_uDeviceAddr = 0x00;                                                 //设备地址   
-    float m_fps = 0.0;                                                                           //帧率      
+    float m_fps = 0.0;                                                          //帧率  
+
     std::mutex mtx_data;
     std::mutex mtx_error;
     std::queue<ErrorCode> m_errorCode;
+
     double startTimes = 0.0;
     std::vector<DeviceInfo>m_vcDeviceInfo;
-    bool m_bStart = false;                                       //是否启动
+    bool m_bStart = false;                                                      //是否启动
     std::mutex m_mtx;
     bool m_bInit = false;
+
     std::atomic<bool>      m_thread_enable;
-    std::mutex               m_mtxStared;
-    std::condition_variable  m_cvStarted;
-    bool                     m_bStared {false};
     
     std::vector<unsigned char>m_lstBuff;
     std::vector<unsigned char>m_lstTemp;
     std::mutex m_mtxBuff;
 
+    //升级
+    std::thread m_threadUpgradRead;
+    std::thread m_threadUpgradParse;
+    bool m_isResponseCommand = false;               //是否收到应答指令
+    UPGRDE_FARMWARE_PKG m_pUPGRDE_FARMWARE_PKG;     //应答数据结构
+    std::vector<unsigned char> m_lstUpgrdeBuff;
+    std::vector<unsigned char> m_lstUpgrdeTemp;
+    std::mutex m_mutUpgrdeBuff;
+    float m_fProgress = 0.0;
+    std::mutex m_mutProgress;
+    UINT64 m_u64DevicesTime = 0;
+    int m_iCount = 0;
 };
 #endif
