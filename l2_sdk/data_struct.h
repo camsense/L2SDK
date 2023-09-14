@@ -54,7 +54,7 @@ typedef struct _deviceInfo{
 
 typedef struct _PointData{
     bool bflag;                                  //是否有效： true - 有效   false - 无效
-    bool bfiter;                                 //是否滤波:  true - 是     false - 否
+    bool bfiter;                                 //是否被过滤:  true - 是     false - 否
     float x;                                     //x坐标
     float y;                                     //y坐标
     unsigned char quality;                       //亮度信息

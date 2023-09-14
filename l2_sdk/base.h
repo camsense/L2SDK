@@ -135,7 +135,7 @@ typedef struct {
 typedef struct {
     update_head pkg_head;               //包头
     unsigned short valid_len;           //数据长度
-    unsigned char data[1024];           //数据
+    unsigned char data[2048];           //数据
     unsigned short pck_checksum;        //包校验和
 }UPGRDE_DATA_PKG;
 
@@ -246,6 +246,7 @@ private:
     bool upgradeDataEnd(const UINT8 addr, unsigned char data[], const unsigned short len, UINT8 uIndex);    //升级结束
     bool upgradeReset(const UINT8 addr, const unsigned short FW_checksum);                                  //校验重启
 
+    bool sendUpgradeData(unsigned char data[], const unsigned short len);
 
     std::thread m_threadCmd ;
     std::thread m_threadParse;

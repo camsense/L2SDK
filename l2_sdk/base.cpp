@@ -393,54 +393,6 @@ bool CBase::getDeviceAddrCmd()
     }
     delay(100);
     return  true;
-
-
-
-    #if 0
-    std::this_thread::sleep_for(std::chrono::milliseconds(15));
-    m_serial.flushReceiver();
-    unsigned char  cData[4] = { 0x55, 0x0A,0x00, 0x5F };
-    if (m_serial.writeData2(cData, sizeof(cData)) != sizeof(cData))
-    {
-        printf("write DeviceAddrCmd failed!\n");
-        writeErrorCode(ERROR_ADDR_CMD_FAIL);
-        return false;
-    }
-   
-    delay(5);
-    int nLen = 4;
-    unsigned char  cBuff[4] = { 0 };
-    if (m_serial.readChars(cBuff, nLen,100) != nLen)
-    {
-        writeErrorCode(ERROR_ADDR_CMD_FAIL);
-        printf("read  Device Addr failed!\n");
-        m_serial.readData(cBuff, nLen,30) ;
-        return false;
-    }
-
-     #endif
-
-#if 0
-    unsigned char ucSum = (cBuff[0] + cBuff[1] + cBuff[2]);
-    
-    if (ucSum != cBuff[3])
-    {
-        writeErrorCode(ERROR_ADDR_CMD_FAIL);
-        printf("Device addr CheckSum failed!\n");
-        return false;
-    }
-
-    if (cBuff[0] == 0x55 && cBuff[1] == 0x0A)
-    {
-        addr = cBuff[2];
-        printf("get Device Add: %d \r\n", addr);
-        m_uDeviceAddr = addr;
-        return true;
-    }
-    printf("get Device Addr failed!\r\n");
-    writeErrorCode(ERROR_ADDR_CMD_FAIL);
-    return false;
-#endif
    
 }
 
@@ -453,158 +405,6 @@ bool CBase::getDeviceInfoCmd()
         writeErrorCode(ERROR_INFO_CMD_FAIL);
         return false;
     }
-    return true;
-
-    #if 0
-    unsigned char  buff[255] = { 0 };
-    if(!reviceData(buff, sizeof(stDeviceInfoPkg) * m_uDeviceAddr)){
-         writeErrorCode(ERROR_INFO_CMD_FAIL);
-        return false;
-    }
-
-    for (int i = 0; i < m_uDeviceAddr; i++) {
-        stDeviceInfoPkg stDeviceInfoTemp;
-        memset(&stDeviceInfoTemp, 0, sizeof(stDeviceInfoTemp));
-        int nLen = sizeof(stDeviceInfoTemp);
-        unsigned char  cBuff[100] = { 0 };
-        memcpy(cBuff, buff, nLen);
-        if (cBuff[0] == 0x55 && cBuff[1] == 0x0b)
-        {
-            memcpy(&stDeviceInfoTemp, cBuff + nLen*i, nLen);
-        }
-      
-        unsigned char ucSum = 0;
-        for (int n = 0; n < nLen - 1; n++)
-        {
-            ucSum += cBuff[n];
-        }
-
-        if (ucSum != stDeviceInfoTemp.ucSum)
-        {
-            writeErrorCode(ERROR_INFO_CMD_FAIL);
-            printf("getDeviceInfoCmd CheckSum failed!\r\n");
-            return false;
-        }
-
-        DeviceInfo info;
-        //addr
-        info.addr = i + 1;
-
-        char buf[128] = {0};
-        //ID 
-        for (int j = 0; j < 8; j++)
-        {
-            sprintf(buf + i, "%c", stDeviceInfoTemp.ucID[i]);
-        }
-        info.deviceID = buf;
-        
-         //
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%c%c", stDeviceInfoTemp.ucManuInfo[0], stDeviceInfoTemp.ucManuInfo[1]);
-        info.factoryInfo = buf;
-
-        //productName
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%c%c", stDeviceInfoTemp.ucProductInfo[0], stDeviceInfoTemp.ucProductInfo[1]);
-        info.productName = buf;
-
-        //version
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%c%c.%c.%c", stDeviceInfoTemp.ucFirmwareVersion[0], 
-            stDeviceInfoTemp.ucFirmwareVersion[1],
-            stDeviceInfoTemp.ucFirmwareVersion[2], 
-            stDeviceInfoTemp.ucFirmwareVersion[3]);
-        info.firmwareVersion = buf;
-        m_vcDeviceInfo.push_back(info);
-    }
-#endif
-
-#if 0
-#if defined (_WIN32) || defined(_WIN64)
-    Sleep(2);
-#else 
-    delay(15);
-#endif
-    std::vector<DeviceInfo> ().swap(m_vcDeviceInfo);
-
-    if (m_uDeviceAddr == 0x00)
-    {
-        printf(" no find device,please get device addr \r\n");
-        return false;
-    }
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(15));
-    unsigned char  cData[4] = { 0x55, 0x0B,0x00,0x60 };
-    m_serial.flushReceiver();
-    if (m_serial.writeData2(cData, sizeof(cData)) < 1)
-    {
-        printf("write getDeviceInfoCmd failed! \r\n");
-        writeErrorCode(ERROR_INFO_CMD_FAIL);
-        return false;
-    }
-
-    for (int i = 0; i < m_uDeviceAddr; i++) {
-        stDeviceInfoPkg stDeviceInfoTemp;
-        memset(&stDeviceInfoTemp, 0, sizeof(stDeviceInfoTemp));
-        int nLen = sizeof(stDeviceInfoTemp);
-        unsigned char  cBuff[255] = { 0 };
-        if (m_serial.readChars(cBuff, nLen,100) != nLen)
-        {
-            printf("read  getDeviceInfoCmd failed! \r\n");
-            writeErrorCode(ERROR_INFO_CMD_FAIL);
-            return false;
-        }
-        
-        if (cBuff[0] == 0x55 && cBuff[1] == 0x0b)
-        {
-            memcpy(&stDeviceInfoTemp, cBuff, nLen);
-        }
-      
-        unsigned char ucSum = 0;
-        for (int n = 0; n < nLen - 1; n++)
-        {
-            ucSum += cBuff[n];
-        }
-
-        if (ucSum != stDeviceInfoTemp.ucSum)
-        {
-            writeErrorCode(ERROR_INFO_CMD_FAIL);
-            printf("getDeviceInfoCmd CheckSum failed!\r\n");
-            return false;
-        }
-
-        DeviceInfo info;
-        //addr
-        info.addr = i + 1;
-
-        char buf[128] = {0};
-        //ID 
-        for (int j = 0; j < 8; j++)
-        {
-            sprintf(buf + i, "%c", stDeviceInfoTemp.ucID[i]);
-        }
-        info.deviceID = buf;
-        
-         //
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%c%c", stDeviceInfoTemp.ucManuInfo[0], stDeviceInfoTemp.ucManuInfo[1]);
-        info.factoryInfo = buf;
-
-        //productName
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%c%c", stDeviceInfoTemp.ucProductInfo[0], stDeviceInfoTemp.ucProductInfo[1]);
-        info.productName = buf;
-
-        //version
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%c%c.%c.%c", stDeviceInfoTemp.ucFirmwareVersion[0], 
-            stDeviceInfoTemp.ucFirmwareVersion[1],
-            stDeviceInfoTemp.ucFirmwareVersion[2], 
-            stDeviceInfoTemp.ucFirmwareVersion[3]);
-        info.firmwareVersion = buf;
-        m_vcDeviceInfo.push_back(info);
-    }
-    #endif
     return true;
 }
 
@@ -652,12 +452,6 @@ bool CBase::StopScanCmd()
         return false;
     }
     delay(200);
-    #if 0
-    if(m_serial.writeData2(cData, sizeof(cData)) != sizeof(cData)){
-        writeErrorCode(ERROR_STOPSCAN_CMD_FAIL);
-        return false;
-    }
-    #endif
     return true;
 }
 
@@ -845,6 +639,9 @@ bool CBase::upgradeDataStart(const UINT8 addr)
     ucBuff[size - 2] = uSum;
     ucBuff[size - 1] = uSum >> 8;
 
+    return  sendUpgradeData(ucBuff, size);
+
+#if 0
     if (m_serial.writeData2(ucBuff, size) < 1)
     {
         printf("upgradeStart cmd write failed!\n");
@@ -868,17 +665,32 @@ bool CBase::upgradeDataStart(const UINT8 addr)
         delay(5);
     }
 
-    return false;;
+    return false;
+#endif
 }
 
 bool CBase::upgradeData(const UINT8 addr, unsigned char data[], const unsigned short len, UINT8 uIndex)
 {
     m_isResponseCommand = false;
-    if (len > 1024)
+    if (len > 2048)
     {
         printf("updata len out\n");
         return false;
     }
+    unsigned char ucBuff[1024*4] = { 0 };
+    int iHeadSize = sizeof(update_head);
+    update_head pkg_head;
+    memset(&pkg_head, 0, iHeadSize);
+    pkg_head.head = 0x0E55;
+    pkg_head.id = addr;
+    pkg_head.err = 0;
+    pkg_head.update_cmd = UPDATE_CMD_DATA;
+    pkg_head.seq_k = uIndex;
+    memcpy(ucBuff, &pkg_head, iHeadSize);
+    memcpy(&ucBuff[iHeadSize], &len, sizeof(unsigned short));
+    memcpy(&ucBuff[iHeadSize + 2], data, len);
+
+#if 0
 
     UPGRDE_DATA_PKG pPkg;
     memset(&pPkg, 0, sizeof(pPkg));
@@ -892,45 +704,46 @@ bool CBase::upgradeData(const UINT8 addr, unsigned char data[], const unsigned s
     memcpy(pPkg.data, data, len);
 
     int size = sizeof(pPkg);
-    unsigned char ucBuff[2048] = { 0 };
+ 
     memcpy(ucBuff, &pPkg, size);
-
+#endif
     unsigned short uSum = 0;
+    int size = len + iHeadSize + 4;
     for (int i = 0; i < size - 2; i++)
     {
         uSum += ucBuff[i];
     }
     ucBuff[size - 2] = uSum;
     ucBuff[size - 1] = uSum >> 8;
-
-    if (m_serial.writeData2(ucBuff, size) < 1)
-    {
-        printf("upgradeStart cmd write failed!\n");
-        return false;
-    }
-    double timeStart = m_serial.GetTimeStamp() / 1.0e6;
-    while (true)
-    {
-        if (m_isResponseCommand)
-        {
-            return true;
-        }
-
-        double timeEnd = m_serial.GetTimeStamp() / 1.0e6;
-        if (timeEnd - timeStart >= 1000.0)
-        {
-            printf("未收到返回指令\n");
-            return false;
-        }
-        delay(5);
-    }
-
-    return true;
+    return sendUpgradeData(ucBuff, size);
 }
 
 bool CBase::upgradeDataEnd(const UINT8 addr, unsigned char data[], const unsigned short len, UINT8 uIndex)
 {
     m_isResponseCommand = false;
+    unsigned char ucBuff[1024 * 4] = { 0 };
+    int iHeadSize = sizeof(update_head);
+    update_head pkg_head;
+    memset(&pkg_head, 0, iHeadSize);
+    pkg_head.head = 0x0E55;
+    pkg_head.id = addr;
+    pkg_head.err = 0;
+    pkg_head.update_cmd = UPDATE_CMD_DATA_END;
+    pkg_head.seq_k = uIndex;
+    memcpy(ucBuff, &pkg_head, iHeadSize);
+    memcpy(&ucBuff[iHeadSize], &len, sizeof(unsigned short));
+    memcpy(&ucBuff[iHeadSize + 2], data, len);
+    unsigned short uSum = 0;
+    int size = len + iHeadSize + 4;
+    for (int i = 0; i < size - 2; i++)
+    {
+        uSum += ucBuff[i];
+    }
+    ucBuff[size - 2] = uSum;
+    ucBuff[size - 1] = uSum >> 8;
+    return sendUpgradeData(ucBuff, size);
+#if 0
+
     UPGRDE_DATA_PKG pPkg;
     memset(&pPkg, 0, sizeof(pPkg));
     pPkg.pkg_head.head = 0x0E55;
@@ -953,31 +766,7 @@ bool CBase::upgradeDataEnd(const UINT8 addr, unsigned char data[], const unsigne
     }
     ucBuff[size - 2] = uSum;
     ucBuff[size - 1] = uSum >> 8;
-
-    if (m_serial.writeData2(ucBuff, size) < 1)
-    {
-        printf("upgradeStart cmd write failed!\n");
-        return false;
-    }
-
-    //获取FM_sun
-
-    double timeStart = m_serial.GetTimeStamp() / 1.0e6;
-    while (true)
-    {
-        if (m_isResponseCommand)
-        {
-            return true;
-        }
-
-        double timeEnd = m_serial.GetTimeStamp() / 1.0e6;
-        if (timeEnd - timeStart >= 1000.0)
-        {
-            printf("未收到返回指令\n");
-            return false;
-        }
-        delay(5);
-    }
+#endif
 }
 
 bool CBase::upgradeReset(const UINT8 addr, const unsigned short FW_checksum)
@@ -1007,28 +796,39 @@ bool CBase::upgradeReset(const UINT8 addr, const unsigned short FW_checksum)
     ucBuff[size - 2] = uSum;
     ucBuff[size - 1] = uSum >> 8;
 
-    if (m_serial.writeData2(ucBuff, size) < 1)
-    {
-        printf("upgradeStart cmd write failed!\n");
-        return false;
-    }
+    return sendUpgradeData(ucBuff, size);
+}
 
-    double timeStart = m_serial.GetTimeStamp() / 1.0e6;
-    while (true)
+bool CBase::sendUpgradeData(unsigned char data[], const unsigned short len)
+{
+    int iCount = 0;
+    while (iCount++ < 3)    //重发三次机制
     {
-        if (m_isResponseCommand)
+        if (m_serial.writeData2(data, len) < 1)
         {
-            return true;
+            printf("upgradeStart cmd write failed!\n");
+            delay(10);
+            continue;
         }
+        double timeStart = m_serial.GetTimeStamp() / 1.0e6;
 
-        double timeEnd = m_serial.GetTimeStamp() / 1.0e6;
-        if (timeEnd - timeStart >= 1000.0)
+        while (true)
         {
-            printf("no revice cmd data\n");
-            return false;
+            if (m_isResponseCommand)
+            {
+                return true;
+            }
+
+            double timeEnd = m_serial.GetTimeStamp() / 1.0e6;
+            if (timeEnd - timeStart >= 1000.0)
+            {
+                break;
+            }
+            delay(5);
         }
-        delay(5);
     }
+    return false;
+
 }
 
 void CBase::writePointBuffer(stOutputPoint& data)
@@ -1946,13 +1746,15 @@ int CBase::upgradeBin(const char* path, const UINT8 addr)
     }
     delay(20);
     setProgress(20);
+
+#define BIN_OFFSET 256
     //发送数据
-    int iCount = iSize / 1024;
+    int iCount = iSize / BIN_OFFSET;
     int iOffset = 0;
     int iIndex = 0;
     while (iOffset < iSize){
-        unsigned short usWriteSize = (iSize - iOffset) > 1024 ? 1024 : (iSize - iOffset);
-        if (usWriteSize == 1024){
+        unsigned short usWriteSize = (iSize - iOffset) > BIN_OFFSET ? BIN_OFFSET : (iSize - iOffset);
+        if (usWriteSize == BIN_OFFSET){
             if (upgradeData(0x00, &Buff[iOffset], usWriteSize, iIndex)){
                 iOffset += usWriteSize;
                 setProgress(20 + (float)iOffset / (float)iSize * 70);
@@ -2005,7 +1807,6 @@ int CBase::upgradeBin(const char* path, const UINT8 addr)
 
         return -9;                  // 升级校验重启失败
     }
-
     delay(20);
 
     if (Buff){
@@ -2148,7 +1949,7 @@ bool CBase::parseUpgradeData(std::vector<unsigned char> &lstData)
     memcpy(&m_pUPGRDE_FARMWARE_PKG, lstData.data(), sizeof(m_pUPGRDE_FARMWARE_PKG));
     if (uSum == m_pUPGRDE_FARMWARE_PKG.pck_checksum)
     {
-        printf("addr:%d, cmd:%d\n", m_pUPGRDE_FARMWARE_PKG.pkg_head.id, m_pUPGRDE_FARMWARE_PKG.pkg_head.update_cmd);
+        //printf("addr:%d, cmd:%d\n", m_pUPGRDE_FARMWARE_PKG.pkg_head.id, m_pUPGRDE_FARMWARE_PKG.pkg_head.update_cmd);
         printf("err:%d, seq_k: %d\n", m_pUPGRDE_FARMWARE_PKG.pkg_head.err, m_pUPGRDE_FARMWARE_PKG.pkg_head.seq_k);
         printf("filter:%d,fw_checksum: %d \n", m_pUPGRDE_FARMWARE_PKG.filter, m_pUPGRDE_FARMWARE_PKG.fw_checksum);
 
