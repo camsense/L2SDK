@@ -5,6 +5,9 @@
 #include "l2_sdk.h"
 #include <thread>
 #include<fstream>
+#include<stdio.h>
+#include <string.h>
+//#include <opencv2/opencv.hpp>
 
 #ifdef __linux__
 #include <unistd.h>
@@ -14,7 +17,6 @@
 
 using namespace std;
 
-
 static void delay(UINT32 ms) {
 #ifdef __linux__
 	if(ms != 0){usleep(ms * 1000);}
@@ -22,7 +24,6 @@ static void delay(UINT32 ms) {
 	Sleep(ms);
 #endif
 }
-
 
 static void savedata(std::vector<stOutputPoint>& data)
 {
@@ -62,12 +63,14 @@ void showProcess(float temp ) {
    
 }
 
+
 int main()
 {
 	cout << "camsense L2 sdk" << endl;
     cout << "-------------------------------------" << endl;
     cout << " 1、启动设备 " << endl;
     cout << " 2、升级设备 " << endl;
+    cout << " 3、切换图像模式,并输出图像 " << endl;
     cout << "-------------------------------------" << endl;
     cout << " 请输入: " << endl;
     int type = 1;
@@ -124,6 +127,11 @@ int main()
         }
     }
     else if(type == 1){
+        //----------------------------------------------
+        //如果当前为图像模式
+        apiStopScan();
+        delay(1400);
+        //----------------------------------------------
 
         int nAddr = apiGetDeviceAddr();
         if (nAddr == 0) {
@@ -181,10 +189,83 @@ int main()
                 }
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
             std::this_thread::yield();
         };
     }
+    else if (3 == type)
+    {
+        apiStopScan();
+        delay(1400);
+        int nAddr = apiGetDeviceAddr();
+        if (nAddr == 0) {
+            cout << "apiGetDeviceAddr fail!" << endl;
+            apiSDKUninit();
+            return 0;
+        }
+        cout << "max addr:" << nAddr << endl;
+
+        for (int i = 1; i <= nAddr; i++) {
+            std::string file = "addr" + std::to_string(i) + ".csv";
+            std::ofstream in(file);
+            in << "loctime,devicetime,Exptime,是否有效,是否滤波,x,y,亮度信息,row" << endl;
+            in.close();
+        }
+
+        std::vector<DeviceInfo> info;
+        if (!apiGetDeviceInfo(info))
+        {
+            cout << "get device info failed" << endl;
+            return 0;
+        }
+
+        for (auto it : info) {
+            printf("add:%d, factoryInfo:%s,firmwareVersion:%s, productName:%s, SN:%s\r\n",
+                it.addr, it.factoryInfo.c_str(), it.firmwareVersion.c_str(), it.productName.c_str(), it.deviceSN.c_str());
+        }
+
+        cout << "get device info  fanish!" << endl;
+        delay(15);
+
+        printf("Please select addr:\n");
+	    int addr = 1;
+        std::cin >> addr;
+        if (addr > nAddr || addr <= 0) 
+        {
+            /* code */
+             printf("input  addr failed!\n");
+            return 0;
+        }
+        
+        if (!apiSwitchImgMode(addr))
+        {
+             printf("apiSwitchImgMode failed!\n");
+            apiSDKUninit();
+            return 0;
+        }
+        
+        int Index = 0;
+        while (1)
+        {
+            std::string strType = info.at(addr - 1).productName;
+            std::string strFileName = std::to_string(Index) + ".bmp";
+            stImgData imgData;
+            if(apiGetImgData(imgData)){
+                 printf("get img data: %d.bmp\n",Index);
+                saveImgData(imgData.data, strFileName.c_str(), strType);
+
+                 //cv::Mat imgTemp(160, 160, CV_8UC1);
+                //memcpy(imgTemp.data,imgData.data , 160* 160 );
+               // cv::imwrite(std::to_string(Index) +"_0cv.bmp" , imgTemp); 
+               
+                Index++;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            std::this_thread::yield();
+        }
+        
+    }
+    
 
 	cout << "exit out!" << endl;
 	delay(10);

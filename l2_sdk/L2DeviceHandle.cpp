@@ -68,6 +68,17 @@ bool CL2DeviceHandle::sendTimeStamp(const unsigned int ms)
    return m_pBase.sendTimeStamp(ms);
 }
 
+bool CL2DeviceHandle::sendImgMode(const UINT8 addr)
+{
+    m_pBase.StopScanCmd();
+    return m_pBase.sendImgCmdMode(addr);
+}
+
+bool CL2DeviceHandle::getImgData(stImgData &img)
+{
+    return m_pBase.getImgData(img);
+}
+
 bool CL2DeviceHandle::init(const char *chPort,  int iBaud)
 {
     return m_pBase.init(chPort, iBaud);

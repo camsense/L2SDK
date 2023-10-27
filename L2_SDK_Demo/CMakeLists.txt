@@ -10,10 +10,19 @@ INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/l2_sdk)
 INCLUDE_DIRECTORIES(${PROJECT_SOURCE_DIR}/lib)
 LINK_DIRECTORIES(${PROJECT_SOURCE_DIR}/lib)
 
+#opencv
+# INCLUDE_DIRECTORIES(include()
+#     ${Boost_INCLUDE_DIRS}
+#     ${catkin_INCLUDE_DIRS}
+#     /usr/local/include/opencv4
+#     )
+# file(GLOB OpenCV_LIBS "/usr/local/lib/*.so")
+
 
 # 将源代码添加到此项目的可执行文件。
 add_executable (L2_SDK_Demo "L2_SDK_Demo.cpp" "L2_SDK_Demo.h")
 TARGET_LINK_LIBRARIES (L2_SDK_Demo l2_sdk)
+#target_link_libraries(L2_SDK_Demo ${OpenCV_LIBS})
 
 #TARGET_LINK_LIBRARIES(l2_sdk.lib)
 

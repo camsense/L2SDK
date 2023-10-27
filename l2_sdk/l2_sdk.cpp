@@ -193,6 +193,32 @@ extern "C" {
         return CL2DeviceHandle::Instance().sendTimeStamp(ms);
     }
 
+	/*************************************************
+    @Function: 				apiSwitchImgMode()
+    @Description: 			切换某设备图像模式
+    @Input:					addr - 设备地址
+    @Output:  				nothing
+    @Return: 				false - 失败  true - 成功
+    @Others:
+    *************************************************/
+    bool apiSwitchImgMode(const UINT8 addr)
+    {
+        return CL2DeviceHandle::Instance().sendImgMode(addr);
+    }
+
+	/*************************************************
+    @Function: 				apiGetImgData()
+    @Description: 		获取图像数据
+    @Input:					img - 图像数据
+    @Output:  				nothing
+    @Return: 				false - 失败  true - 成功
+    @Others:
+    *************************************************/
+    bool apiGetImgData(stImgData &img)
+    {
+        return CL2DeviceHandle::Instance().getImgData(img);
+    }
+
 #ifdef __cplusplus
 };
 #endif

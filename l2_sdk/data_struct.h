@@ -89,4 +89,32 @@ typedef struct _OutputPoint
     ERROR_UPDATE_FW_CHECKSUM                            //固件校验和错误
 };
 
+//图片数据
+typedef struct _img_data_struct
+{
+    /* data */
+    unsigned char data[160*160];
+}stImgData;
+
+
+//------------------------------------------------test---------------------------------------------
+#pragma once
+ 
+/**
+ * @file 
+ * @author yzb
+ * @brief 
+ * @version 0.1
+ * @date 2023-09-21
+ *
+ * @copyright Copyright (c) 2023
+ *
+ */
+ 
+#include <condition_variable>
+#include <mutex>
+#include <vector>
+#include <chrono>
+#include <thread>
+ 
 #endif

@@ -191,7 +191,8 @@ bool CBase::configDevices()
 
         //productName
         memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%c%c", stDeviceInfoTemp.ucProductInfo[0], stDeviceInfoTemp.ucProductInfo[1]);
+        sprintf(buf, "%c%c%c%c", stDeviceInfoTemp.ucProductInfo[0], stDeviceInfoTemp.ucProductInfo[1],
+         stDeviceInfoTemp.ucProductInfo[2] , stDeviceInfoTemp.ucProductInfo[3]);
         info.productName = buf;
 
         //version
@@ -385,6 +386,7 @@ bool CBase::configDevices()
 bool CBase::getDeviceAddrCmd()
 {
     unsigned char  cData[4] = { 0x55, 0x0A,0x00, 0x5F };
+    #if 0
     if (m_serial.writeData2(cData, sizeof(cData)) != sizeof(cData))
     {
         printf("write DeviceAddrCmd failed!\n");
@@ -392,6 +394,9 @@ bool CBase::getDeviceAddrCmd()
         return false;
     }
     delay(100);
+    #else
+    return sendData(cData, sizeof(cData));
+    #endif
     return  true;
    
 }
@@ -399,12 +404,16 @@ bool CBase::getDeviceAddrCmd()
 bool CBase::getDeviceInfoCmd()
 {
      unsigned char  cData[4] = { 0x55, 0x0B,0x00,0x60 };
+     #if 0
     if (m_serial.writeData2(cData, sizeof(cData)) < sizeof(cData))
     {
         printf("write getDeviceInfoCmd failed! \r\n");
         writeErrorCode(ERROR_INFO_CMD_FAIL);
         return false;
     }
+    #else
+    return sendData(cData, sizeof(cData));
+    #endif
     return true;
 }
 
@@ -427,10 +436,8 @@ bool CBase::StartScanCmd()
     m_thread_enable = true;
     m_serial.flushReceiver();
 
-    //std::thread threadStart(&CBase::ThreadRun, this);
-    //threadStart.detach();
-
     m_thread_enable = true;
+
     std::thread readThead(&CBase::readDataThread, this);
     readThead.detach();
     std::thread parseThead(&CBase::parseDataThread, this);
@@ -439,19 +446,23 @@ bool CBase::StartScanCmd()
     return true;
 }
 
-
-
 bool CBase::StopScanCmd()
 {
+    m_bFindHead = true;
+    m_bDone = true;
     clearPointBuffer();
     clearErrorCoed();
     unsigned char  cData[] = { 0x55, 0x0D, 0x00, 0x62 }; 
     //m_serial.flushReceiver();
+    #if 0
     if(m_serial.writeData2(cData, sizeof(cData)) != sizeof(cData)){
         writeErrorCode(ERROR_STOPSCAN_CMD_FAIL);
         return false;
     }
     delay(200);
+    #else
+    return sendData(cData, sizeof(cData));
+    #endif
     return true;
 }
 
@@ -459,11 +470,6 @@ void CBase::getFps(float &fps)
 {
     std::unique_lock<std::mutex> uclk(mtx_data);
     fps = m_fps;
-}
-
-UINT8 CBase::getDeviceAddr()
-{
-    return UINT8();
 }
 
 //
@@ -958,228 +964,35 @@ bool CBase::reviceAddr(std::vector<unsigned char> &lstData)
 
 bool CBase::reviceDeviceInfo(std::vector<unsigned char> &lstData)
 {
-        stDeviceInfoPkg stDeviceInfoTemp;
-        memset(&stDeviceInfoTemp, 0, sizeof(stDeviceInfoTemp));
-        int nLen = sizeof(stDeviceInfoTemp);
-        if(lstData.size()  < nLen) {
-            return false;
-        }
-
-        memcpy(&stDeviceInfoTemp, &lstData[0], nLen);
-    
-        unsigned char ucSum = 0;
-        for (int n = 0; n < nLen - 1; n++)
-        {
-            ucSum += lstData[n];
-        }
-
-        eraseBuff(lstData, nLen);
-
-        if (ucSum != stDeviceInfoTemp.ucSum)
-        {
-            writeErrorCode(ERROR_INFO_CMD_FAIL);
-            printf("getDeviceInfoCmd CheckSum failed!\r\n");
-            return false;
-        }
-
-         if(stDeviceInfoTemp.ucAddr > 0 && stDeviceInfoTemp.ucAddr <4){
-            m_arrDeviceInfo[stDeviceInfoTemp.ucAddr- 1] = stDeviceInfoTemp;
-        }
-
-#if 0 
-        DeviceInfo info;
-        //addr
-        info.addr = stDeviceInfoTemp.ucAddr;
-
-        char buf[128] = {0};
-        //ID 
-        for (int j = 0; j < 8; j++)
-        {
-            sprintf(buf, "%c", stDeviceInfoTemp.ucID[j]);
-        }
-        info.deviceID = buf;
-        
-         //
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%c%c", stDeviceInfoTemp.ucManuInfo[0], stDeviceInfoTemp.ucManuInfo[1]);
-        info.factoryInfo = buf;
-
-        //productName
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%c%c", stDeviceInfoTemp.ucProductInfo[0], stDeviceInfoTemp.ucProductInfo[1]);
-        info.productName = buf;
-
-        //version
-        memset(buf, 0, sizeof(buf));
-        sprintf(buf, "%c%c.%c.%c", stDeviceInfoTemp.ucFirmwareVersion[0], 
-            stDeviceInfoTemp.ucFirmwareVersion[1],
-            stDeviceInfoTemp.ucFirmwareVersion[2], 
-            stDeviceInfoTemp.ucFirmwareVersion[3]);
-        info.firmwareVersion = buf;
-        if(info.addr > 0 && info.addr <4){
-            m_arrDeviceInfo[info.addr - 1] = info;
-        }
-        #endif
-    return true;
-}
-
-void CBase::ThreadRun()
-{
-    m_thread_enable = true;
-    int nFps = 0;
-    while (m_thread_enable) {
-        PKGDATA stTemp;
-        TIMEPKG stTime;
-        int bRes = 0;
-        bRes = ParsePackData(stTemp, stTime);
-
-        std::unique_lock<std::mutex> lck(mtx_data);
-        double endTimes = m_serial.GetTimeStamp() / 1.0e6;
-        nFps++;
-        if (endTimes - startTimes >= 1000.0)
-        {
-            m_fps = nFps;
-            nFps = 0;
-            startTimes = endTimes;
-        }
-
-        if (bRes > 0) 
-        {
-            std::vector<POINTDATA> vcPoint;
-            for (int i = 0; i < 160; i++)
-            {
-                POINTDATA pTemp;
-                float x = (float)stTemp.data[i].x * 0.1;
-                float y = (float)stTemp.data[i].y * 0.1;
- 
-                pTemp.bflag = stTemp.data[i].flag;
-                pTemp.x = x;
-                pTemp.y = y;
-                pTemp.bfiter = stTemp.data[i].fiter;
-                pTemp.quality = stTemp.data[i].quality;
-                pTemp.row = stTemp.data[i].row;
-                vcPoint.push_back(pTemp);
-            }
-            stOutputPoint outPoint;
-            outPoint.u64LocTimeStampS = getCurrentTimestampUs() / 1000;
-            outPoint.u64ExposureTimeStamp = stTemp.u64Ms;
-            outPoint.u64DeviceTimeStampS = stTime.usMs;
-            outPoint.uaddr = stTemp.ucAddr;
-            outPoint.Point.swap(vcPoint);
-            writePointBuffer(outPoint);
-
-        }
-       std::this_thread::sleep_for(std::chrono::microseconds(1));
-        //Sleep(1);
-    };
-}
-
-int CBase::ParsePackData(PKGDATA& Data, TIMEPKG& time)
-{
-#define MAX_COUNT  100
-    unsigned char uCur = 0x00;
-    int nCount = 0;
-    int nStep = 0;
-    unsigned char ucBuffer[1024 * 5] = { 0 };
-    int nResCount = 0;
-    int iPointPkgSize = sizeof(PKGDATA);
-    int iTimePkgSize = sizeof(TIMEPKG);
-
-    while (m_thread_enable)
-    {
-        if (m_serial.readChar(&uCur, 5) != 1)
-        {
-            nStep = 0;
-            nCount++;
-            if (nCount > MAX_COUNT)
-            {
-                printf("read char failed!\r\n");
-                writeErrorCode(ERROR_NOT_DATA);
-                nCount = 0;
-                return -1;
-            }
-            continue;
-        }
-        int nDataLen = 0;
-        switch (nStep)
-        {
-        case eTimeHead0:
-            if (uCur == 0x55)
-            {
-                nStep = eTimeHead1;
-                ucBuffer[0] = 0x55;
-            }
-            break;
-        case eTimeHead1:
-            if (uCur == 0x0F)
-            {
-                nStep = eTimeData;
-                ucBuffer[1] = 0x0F;
-            }
-            else {
-                nStep = eTimeHead0;
-            }
-            break;
-        case eTimeData:
-            ucBuffer[2] = uCur;
-            if (m_serial.readData(&ucBuffer[3], iTimePkgSize - 3) == iTimePkgSize - 3)
-            {
-                nStep = eTimeSum;
-            }
-            else {
-                memset(ucBuffer, 0, sizeof(ucBuffer));
-                nStep = eTimeHead0;
-            }
-            break;
-        default:
-            break;
-        }
-
-        if (nStep == eTimeSum) {
-            nStep = 4;
-            if (!CheckSum(ucBuffer, iTimePkgSize))
-            {
-                nStep = 0;
-            }
-            memcpy(&time, ucBuffer, iTimePkgSize);
-        }
-
-        if (nStep == eDataPkg)
-        {
-            delay(1);
-            for (int i = 0 ; i < m_uDeviceAddr; i++)
-            {
-                int iLen = m_serial.readData(&ucBuffer[iTimePkgSize], iPointPkgSize, 1000);
-                //printf("read data len: %d!\r\n",iLen);
-                if (iLen != iPointPkgSize)
-                {
-                    nStep = eTimeHead0;
-                    printf("read char  iPointPkgSize failed!\r\n");
-                    memset(ucBuffer, 0, sizeof(ucBuffer));
-                    return -1;
-                }
-                if (ucBuffer[iTimePkgSize] != 0x55 || 0xAA != ucBuffer[iTimePkgSize + 1])
-                {
-                    memset(ucBuffer, 0, sizeof(ucBuffer));
-                    printf("point data head error!\r\n");
-                    return -1;
-                }
-
-                if (!CheckSum(&ucBuffer[iTimePkgSize], iPointPkgSize))
-                {
-                    //printf("dist CheckSum  failed!\r\n");
-                    nStep = eTimeHead0;
-                    memset(ucBuffer, 0, sizeof(ucBuffer));
-                    //writeErrorCode(ERROR_CHECKSUM_FAIL);
-                    return -1;
-                }
-                memcpy(&Data, &ucBuffer[iTimePkgSize], sizeof(PKGDATA));
-            }
-            return 1;
-        }
+    stDeviceInfoPkg stDeviceInfoTemp;
+    memset(&stDeviceInfoTemp, 0, sizeof(stDeviceInfoTemp));
+    int nLen = sizeof(stDeviceInfoTemp);
+    if(lstData.size()  < nLen) {
+        return false;
     }
-    return 0;
 
+    memcpy(&stDeviceInfoTemp, &lstData[0], nLen);
+
+    unsigned char ucSum = 0;
+    for (int n = 0; n < nLen - 1; n++)
+    {
+        ucSum += lstData[n];
+    }
+
+    eraseBuff(lstData, nLen);
+
+    if (ucSum != stDeviceInfoTemp.ucSum)
+    {
+        writeErrorCode(ERROR_INFO_CMD_FAIL);
+        printf("getDeviceInfoCmd CheckSum failed!\r\n");
+        return false;
+    }
+
+        if(stDeviceInfoTemp.ucAddr > 0 && stDeviceInfoTemp.ucAddr <4){
+        m_arrDeviceInfo[stDeviceInfoTemp.ucAddr- 1] = stDeviceInfoTemp;
+    }
+
+    return true;
 }
 
 /*******************************************************************
@@ -1208,201 +1021,6 @@ bool CBase::CheckSum(unsigned char* buff, int len)
     }
 
     return (nCheck == nSum) ? true : false;
-}
-
-//read  thread
-void CBase::ThreadRead()
-{
-    unsigned char  ucBuff[1024] = { 0 };
-    int nErrorCount = 0;
-    clearDataBuffer();
-    while (m_thread_enable) {
-        /* code */
-        int nLen =  m_serial.readChar(ucBuff, 10);
-        if ( nLen  <= 0){
-            nErrorCount++;
-            if(nErrorCount >= sizeof(PKGDATA)){
-                    printf("read char failed!\r\n");
-                    nErrorCount = 0;
-                    memset(ucBuff, 0, sizeof(ucBuff));
-                    writeErrorCode(ERROR_NOT_DATA);
-            }
-            continue;
-        }
-
-		for (int i = 0; i < nLen; i++){
-			writeDataBuffer(ucBuff[i]);
-		}
-        memset(ucBuff, 0, sizeof(ucBuff));
-        
-    };
-    
-}
-
-void CBase::ThreadParsePkg()
-{
-    double startTimes =  m_serial.GetTimeStamp()/ 1.0e6;
-    double endTimes =  m_serial.GetTimeStamp()/ 1.0e6;
-    PKGDATA data;
-    int nFps = 0;
-#ifdef __linux__
-    delay(50);
-#else
-    Sleep(50);
-#endif
-     while (m_thread_enable)
-     {
-        std::unique_lock<std::mutex> lck(mtx_data);
-        endTimes =  m_serial.GetTimeStamp()/ 1.0e6;
-        memset(&data, 0 , sizeof(data));
-        int nRes =  ParasePkg(data);
-         nFps++;
-        if (endTimes - startTimes >= 1000.0)
-        {
-            if (m_uDeviceAddr != 0x00)
-            {
-                m_fps = (float)nFps / (float)m_uDeviceAddr;
-            }
-            nFps = 0;
-            //printf("fps: %.2f\r\n", m_fps);
-            startTimes = endTimes;
-        }
-        if(nRes > 0){
-             std::vector<POINTDATA> vcPoint;
-            for (int i = 0; i < 160; i++)
-            {
-                POINTDATA pTemp;
-                float x = (float)data.data[i].x * 0.01;
-                float y = (float)data.data[i].y * 0.01;
-                pTemp.bflag = data.data[i].flag;
-                pTemp.x = x;
-                pTemp.y = y;
-                vcPoint.push_back(pTemp);
-            }
-            stOutputPoint outPoint;
-            outPoint.uaddr = data.ucAddr;
-            outPoint.Point.swap(vcPoint);
-            writePointBuffer(outPoint);
-            //printf("add: %d\n", data.ucAD);
-        }
-
-        //std::this_thread::sleep_for(std::chrono::milliseconds(1)); 
-     };
-        
-}
-
-int CBase::ParasePkg(PKGDATA &data)
-{
-    unsigned char uCur = 0x00;
-    int nCount = 0;
-    int nStep = 0;
-    unsigned char ucBuffer[1024 * 5] = { 0 };
-    int nResCount = 0;
-    bool bFindHead = false;
-    int nIndex  = 0;
-
-    int nDataLen = 0;
-    int nFPS = 0;
-#if 0
-    while (m_thread_enable)
-    {
-        //std::this_thread::sleep_for(std::chrono::milliseconds(2)); 
-        if (!bFindHead && readDataBuffer(&uCur, 1) != 1)
-        {
-            bFindHead = false;
-            nStep = 0;
-            nCount++;
-           
-            if (nCount > 921600)
-            {
-                printf(" read time !\r\n");
-                writeErrorCode(ERROR_NOT_DATA);
-                nCount = 0;
-                return -1;
-            }
-            continue;
-        }
-        nCount = 0;
-    
-        switch (nStep)
-        {
-        case eDist55:
-            
-            if (uCur == 0x55)
-            {
-                nStep = eDistAA;
-                ucBuffer[0] = 0x55;
-            }
-            break;
-        case eDistAA:
-            if (uCur == 0xAA)
-            {
-                nStep = eDistCount;
-                ucBuffer[1] = 0xaa;
-            }
-            else {
-                nStep = eDistAA;
-            }
-            break;
-        case eDistCount:
-            ucBuffer[2] = uCur;
-            readDataBuffer(&uCur, 1);
-  
-            ucBuffer[3] = uCur;
-
-            memcpy(&nResCount, &ucBuffer[3], 1);
-            if (nResCount == 160)
-            {
-                nDataLen = nResCount * 6;
-                nStep = eDistData;
-                bFindHead = true;
-                nIndex = 4;
-            }
-            else {
-                nStep = eDist55;
-                nDataLen = 0;
-            }
-            break;
-        default:
-            break;
-        }
-
-        if (nStep == eDistData)
-        {
-            //delay(5);
-            int nLen =  readDataBuffer(&ucBuffer[nIndex], nDataLen + 4);
-            if ( nLen != nDataLen + 4 )
-            {
-                nIndex  += nLen;
-                continue ;
-            }
-
-            if (!CheckSum(ucBuffer, nDataLen + 8))
-            {
-                //printf("dist CheckSum  failed!\r\n");
-                nStep = eDist55;
-                memset(ucBuffer, 0, sizeof(ucBuffer));
-                //writeErrorCode(ERROR_CHECKSUM_FAIL);
-                nStep = eDist55;
-                nDataLen = 0;
-                nIndex = 0;
-                bFindHead = false;
-                return -1;
-            }
-            else{
-                memcpy(&data, ucBuffer, sizeof(PKGDATA));
-                //printf("  add: %d, ucDN:%d,\r\n", data.ucAD, data.ucDN);
-            }
-
-            nStep = eDist55;
-            nDataLen = 0;
-            nIndex = 0;
-            bFindHead = false;
-            return 1;
-        }
-     };
-#endif
-     return 0;
 }
 
 void CBase::ThreadCmd()
@@ -1469,18 +1087,28 @@ void CBase::ThreadParse()
                     switch (cmd_step)
                     {
                     case eScanStop:
-                        printf("stop recive\n");
-                        eraseBuff(m_lstBuff,4);
-                        reviceStop(m_lstBuff);
+                        if (reviceStop(m_lstBuff))
+                        {
+                            /* code */
+                            m_isResponseCommand = true;
+                        }
+                         eraseBuff(m_lstBuff,4);
                         break;
                     case eGetAddr:
-                         printf("addr recive\n");
-                        reviceAddr(m_lstBuff);
+                        if ( reviceAddr(m_lstBuff))
+                        {
+                            /* code */
+                             m_isResponseCommand = true;
+                        }
+                        
                         eraseBuff(m_lstBuff,4);
                         break;
                     case eGetInfo:
-                        reviceDeviceInfo(m_lstBuff);
-                        printf("addr eGetInfo\n");
+                        if (reviceDeviceInfo(m_lstBuff))
+                        {
+                            /* code */
+                            m_isResponseCommand = true;
+                        }
                         break;
                     }
             }else
@@ -1488,6 +1116,38 @@ void CBase::ThreadParse()
                 continue; 
             }
     };
+}
+
+//发送cmd数据
+bool CBase::sendData(unsigned char data[], const int len)
+{
+     int iCount = 0;
+    while (iCount++ < 3)    //重发三次机制
+    {
+        if (m_serial.writeData2(data, len) < 1)
+        {
+            printf(" cmd write failed!\n");
+            delay(10);
+            continue;
+        }
+        double timeStart = m_serial.GetTimeStamp() / 1.0e6;
+
+        while (true)
+        {
+            if (m_isResponseCommand)
+            {
+                return true;
+            }
+
+            double timeEnd = m_serial.GetTimeStamp() / 1.0e6;
+            if (timeEnd - timeStart >= 200.0)
+            {
+                break;
+            }
+            delay(5);
+        }
+    }
+    return false;
 }
 
 //读取点云数据线程
@@ -1509,6 +1169,7 @@ void CBase::readDataThread()
             std::vector<unsigned char> vcTmp(std::begin(data), std::begin(data) + iLen);
             m_lstTemp.insert(m_lstTemp.end(), vcTmp.begin(), vcTmp.end());
         }
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     };
 }
 
@@ -1562,6 +1223,18 @@ void CBase::parseDataThread()
         {
             continue;
         }
+        if(m_uDeviceAddr == 3){
+            //std::this_thread::sleep_for(std::chrono::milliseconds(7));
+            std::this_thread::sleep_for(std::chrono::microseconds(7600));
+            std::this_thread::yield();
+        }else  if(m_uDeviceAddr == 2){
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::this_thread::yield();
+        }
+        else{
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            std::this_thread::yield();
+        }
         eraseBuff(m_lstBuff, iIndex);
         switch (iType)
         {
@@ -1570,18 +1243,15 @@ void CBase::parseDataThread()
             eraseBuff(m_lstBuff, iTimeSize);
             break;
         case 1:           //点云解析
-            ParsePointData(m_lstBuff);
+            parsePointData(m_lstBuff);
             eraseBuff(m_lstBuff, iPointSize);
             break;
         default:
             break;
         }
-        //std::this_thread::sleep_for(std::chrono::milliseconds(1));
-        //std::this_thread::yield();
     }
 
 }
-
 
 //解析时间戳同步
 bool CBase::parseTime(std::vector<unsigned char> &lstData)
@@ -1611,7 +1281,7 @@ bool CBase::parseTime(std::vector<unsigned char> &lstData)
 }
 
 //解析点云
-bool CBase::ParsePointData(std::vector<unsigned char> &lstData)
+bool CBase::parsePointData(std::vector<unsigned char> &lstData)
 {
     PKGDATA pPoint;
     if (lstData.size() < sizeof(pPoint)) {
@@ -1623,7 +1293,6 @@ bool CBase::ParsePointData(std::vector<unsigned char> &lstData)
     }
     memcpy(&pPoint, lstData.data(), sizeof(pPoint));
 
-#if 1
     auto ts = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
     UINT64 u64LocTime = ts / 1000;
     UINT64 uDeviceTime = m_u64DevicesTime;
@@ -1649,8 +1318,137 @@ bool CBase::ParsePointData(std::vector<unsigned char> &lstData)
     outPoint.uaddr = pPoint.ucAddr;
     outPoint.Point.swap(vcPoint);
     writePointBuffer(outPoint);
-#endif
+
     return true;
+}
+
+//解析点云数据
+bool CBase::parseImgData()
+{
+    int nRow = m_iRow;
+    int nCOL = m_iCol;
+    int nSize = nRow * nCOL;
+    int nFps = 0;
+    unsigned char data[nSize] = {0};
+     startTimes = m_serial.GetTimeStamp() / 1.0e6;
+    while (m_thread_enable)
+    {
+        int bRes = 0;
+        bRes = paraseImgEx(data);
+        if (bRes > 0) //是否读取数据
+        {
+             std::lock_guard<std::mutex> lckImg(m_mutImg);
+            {
+                memcpy(m_img_data.data,  data,  nRow * nCOL);
+                m_isGetImg = true;
+            }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        std::this_thread::yield();
+    }
+
+    m_thread_enable = false;
+    //t.join();
+    //readTh.join();
+    printf("threadImage_ exited \r\n");
+    return false;
+}
+
+//图片写入到磁盘（参数1：保存的文件名 参数2：要写的数据   参数3：数据长度）
+int CBase::paraseImgEx(unsigned char *buff)
+{
+   int nRow = 128, nStartRow = 0, nCol = 160, nStartCol = 0;
+    int nStep = 0;
+
+    //寻找第一帧
+    m_bFindHead = false;
+    m_bDone = false;
+    unsigned char uCur = 0xff;
+    unsigned char buffer[1024] = { 0 };
+
+    int nFailedCount = 0;
+    int  nErrorCount = 0;
+
+    while (!m_bFindHead)    //寻找第一帧
+    {
+        if ( m_serial.readData(&uCur, 1, 10) <= 0){
+            nStep = 0;
+            if (nErrorCount++ > nRow * nCol){
+                nErrorCount = 0;
+                return -1;
+            }
+            delay(1);
+            continue;
+        }
+        else {
+            nErrorCount = 0;
+        }
+
+        switch (nStep){
+        case 0:
+            if (0x55 == uCur){
+                nStep = 1;
+                buffer[0] = uCur;
+            }  break;
+        case 1:
+            if (0xAF == uCur){
+                buffer[1] = uCur;
+                nStep = 2;
+                m_serial.readData(&buffer[2], 14, 1000);  //起始行
+                if (CheckSum(buffer, 16)){
+                    memcpy(&nStartRow, &buffer[2], 2);
+                    memcpy(&nRow, &buffer[4], 2);
+                    memcpy(&nStartCol, &buffer[6], 2);
+                    memcpy(&nCol, &buffer[8], 2);
+                    m_bFindHead = true;
+                }else {
+                    nStep = 0;
+                }
+            }else {
+                nStep = 0;
+            }
+            break;
+        default:
+            break;
+        }
+
+        if (nFailedCount++ > (nCol * nRow + 14)) {
+            return -2;
+        }
+    }
+
+    unsigned char* revBuff = new unsigned char[nRow * nCol];
+    int nIndex = 0;
+
+    int nTestIndex = 0;
+    int imgSize = nRow * nCol;
+    while (!m_bDone)    {
+        int nCount = nCol;
+        memset(buffer, 0, sizeof(buffer));
+        int iLen = m_serial.readData(buffer, nCount, 100);
+        if (iLen <= 0){
+            delete[] revBuff;
+            return -2;
+        }else {
+            if (nTestIndex +  iLen >= imgSize){
+                memcpy(revBuff + nTestIndex, buffer, imgSize -  nTestIndex);
+                nTestIndex  = imgSize;
+            }else{
+                memcpy(revBuff + nTestIndex, buffer, iLen);
+                nTestIndex  += iLen;
+            }
+        }
+        if (nTestIndex == imgSize){
+            nTestIndex = 0;
+            m_bDone = true;
+            double clock = 0.0;
+            memcpy(buff, revBuff, nCol * nRow * sizeof(unsigned char));
+            delete[] revBuff;
+            return 1;
+        }
+    }
+    delete[] revBuff;
+    return -1;
 }
 
 int CBase::upgradeBin(const char* path, const UINT8 addr)
@@ -1841,6 +1639,55 @@ bool CBase::sendTimeStamp(const unsigned int ms)
     return true;
 }
 
+//级联出图
+bool CBase::sendImgCmdMode(const UINT8 uaddr)
+{
+     if (uaddr == 0 || uaddr > m_uDeviceAddr) {
+        std::cout << "addr  error !\n";
+        return false;      //输入的地址错误
+    }
+    m_bFindHead = true;
+    m_bDone = true;
+    m_thread_enable = false;
+    m_serial.flushReceiver();
+
+    delay(3200);
+    
+    unsigned char buf[4] = { 0 };
+    buf[0] = 0x55;
+    buf[1] = 0x10;
+    buf[2] =  uaddr;
+    unsigned short uSum = 0;
+    for (int i = 0; i < 3; i++){
+        uSum += buf[i];
+    }
+    buf[3] = uSum;
+    if (m_serial.writeData2(buf, 4) < 1){
+        return false;
+    }
+
+    m_thread_enable = true;
+    //std::thread readImgThead(&CBase::readDataThread, this);
+    //readImgThead.detach();
+    std::thread parseImgThead(&CBase::parseImgData, this);
+    parseImgThead.detach();
+
+    return true;
+}
+
+bool CBase::getImgData(stImgData &img)
+{
+    if (m_isGetImg)
+    {
+        std::lock_guard<std::mutex> lck(m_mutImg);
+        memcpy(img.data, m_img_data.data, m_iRow*m_iCol);
+        memset(m_img_data.data, 0, sizeof(stImgData));
+        m_isGetImg  = false;
+        return true;
+    }
+    return false;
+}
+
 //启动升级
 void CBase::ThreadUpgradeRun()
 {
@@ -1920,7 +1767,6 @@ void CBase::parseUpgradeThead()
 
         eraseBuff(m_lstUpgrdeBuff, iIndex);
         m_isResponseCommand = parseUpgradeData(m_lstUpgrdeBuff);
-        //m_lstBuff.erase(m_lstBuff.begin(), m_lstBuff.begin() + sizeof(UPGRDE_FARMWARE_PKG));
         eraseBuff(m_lstUpgrdeBuff, sizeof(UPGRDE_FARMWARE_PKG));
 
     };

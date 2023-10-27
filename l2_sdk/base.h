@@ -98,11 +98,17 @@ typedef struct _DeviceInfoPkg {
 #define MAGIC_GD_L2			    0x324C4447// GDL2
 #define UPGRDE_HEAD_PKG0        0x55 
 #define UPGRDE_HEAD_PKG1        0x0E
-#define TIME_HEAD_PKG0          0x55 
-#define TIME_HEAD_PKG1          0x0F
-#define POINT_HEAD_PKG0         0x55 
-#define POINT_HEAD_PKG1         0xAA
+#define TIME_HEAD_PKG0                0x55 
+#define TIME_HEAD_PKG1                0x0F
+#define POINT_HEAD_PKG0             0x55 
+#define POINT_HEAD_PKG1             0xAA
 
+#define  MSG_START          0
+#define  MSG_TYPE             1
+#define  MSG_TIME             2
+#define  MSG_POINT          3
+
+#define		MAX_PKT_LEN		1024*4    
 
 //cmd
 enum {
@@ -145,37 +151,51 @@ public:
     CBase(void);
     ~CBase(void);
 
-    bool init(const char *chPort,  int iBaute);                             //初始化
-    bool uninit();                                                          //释放
-    bool configDevices();                                                   //配置设备
-
-    bool  getDeviceAddrCmd();                                               //获取设备地址cmd
-    bool  getDeviceInfoCmd();                                               //获取设备信息cmd
-    bool  StartScanCmd();                                                   //开始扫描cmd
-    bool  StopScanCmd();                                                    //停止扫描cmd   
-
-    void getFps(float& fps);                                                //获取帧率
-    UINT8 getDeviceAddr();                                                  //获取设备地址
-    UINT8 getDeviceNum();                                                   //获取设备个数
+    //初始化
+    bool init(const char *chPort,  int iBaute);    
+     //释放         
+    bool uninit();         
+     //配置设备                                                            
+    bool configDevices();                                                    
+    //获取设备地址cmd
+    bool  getDeviceAddrCmd();       
+    //获取设备信息cmd                                      
+    bool  getDeviceInfoCmd();        
+     //开始扫描cmd                                       
+    bool  StartScanCmd();         
+    //停止扫描cmd                                                
+    bool  StopScanCmd();                                                       
+    //获取帧率
+    void getFps(float& fps);       
+      //获取设备个数                                         
+    UINT8 getDeviceNum();        
+    //获取点云                                         
     int getPointData(std::vector<stOutputPoint> & point, int len);
-    ErrorCode getErrorCode();                                               //获取错误码
-    bool getDeviceInfo(std::vector<DeviceInfo>& info);                      //获取设备信息
+    //获取错误码
+    ErrorCode getErrorCode();              
+    //获取设备信息                                 
+    bool getDeviceInfo(std::vector<DeviceInfo>& info);                  
     inline void setEnable(bool res){                        
             m_thread_enable = res;
     }
-
-    int upgradeBin(const char* path, const UINT8 addr);                     //升级bin文件
-    void setProgress(float percentage) {                                    //设置升级进度
+    //升级bin文件
+    int upgradeBin(const char* path, const UINT8 addr);   
+    //设置升级进度                  
+    void setProgress(float percentage) {                                    
         std::unique_lock<std::mutex> uclk(m_mutProgress);
         m_fProgress = percentage;
     }
-
-    void getProgress(float& percentage) {                                   //获取升级进度
+    //获取升级进度
+    void getProgress(float& percentage) {                                   
         std::unique_lock<std::mutex> uclk(m_mutProgress);
         percentage = m_fProgress;
     }
+    //设置时间戳同步
+    bool sendTimeStamp(const unsigned int ms);          
 
-    bool sendTimeStamp(const unsigned int ms);                             //设置时间戳同步
+    //切换图像模式
+    bool sendImgCmdMode(const UINT8 uaddr );   
+    bool getImgData(stImgData& img) ;              
 
 protected:
     HC_serial m_serial;
@@ -216,44 +236,58 @@ protected:
 
 
 private:
-    void ThreadRun();                                              //运行采集数据并解析点云数据
-    int ParsePackData(PKGDATA& Data, TIMEPKG& time);                              //解析数据
-    bool CheckSum(unsigned char *buff, int len);                   //校验和
-    void ThreadRead();                                             //队列的方式采集数据
-    void ThreadParsePkg();                                         //从队列中读取数据并解析
-    int ParasePkg(PKGDATA& data);                                  //解析队列中的数据
+    bool CheckSum(unsigned char *buff, int len);                     //校验和
     void ThreadCmd();
     void ThreadParse();
+    bool sendData(unsigned char data[], const int len);
 
+    //读取数据线程
     void readDataThread();
+    //解析数据线程
     void parseDataThread();
-    bool parseTime(std::vector<unsigned char> &lstData);
-    bool ParsePointData(std::vector<unsigned char> &lstData);
-
+    //解析时间戳
+    bool parseTime(std::vector<unsigned char> &lstData);   
+      //解析点云                 
+    bool parsePointData(std::vector<unsigned char> &lstData);      
+    
     void ThreadUpgradeRun();                                        //启动升级数据接收线程
     void readUpgradeThead();                                        //读取升级应答数据线程
     void parseUpgradeThead();                                       //解析升级应答指令线程
     bool parseUpgradeData(std::vector<unsigned char> &lstData);     // 解析应答指令函数
-    void UpgradeUninit();                                           //退出升级
+    void UpgradeUninit();                                                   //退出升级
 
-     //升级
-    bool getBinSize(const char* path, unsigned int& size);                       //获取bin文件大小
-    bool getBinData(const char* path, unsigned char* data, unsigned int size);   //获取bin文件数据
-      //升级指令
-    bool upgradeStart(const UINT8 addr);                                                                    //升级开始
-    bool upgradeDataStart(const UINT8 addr);                                                                //升级数据开始
-    bool upgradeData(const UINT8 addr, unsigned char data[], const unsigned short len, UINT8 uIndex);       //升级数据 包
-    bool upgradeDataEnd(const UINT8 addr, unsigned char data[], const unsigned short len, UINT8 uIndex);    //升级结束
-    bool upgradeReset(const UINT8 addr, const unsigned short FW_checksum);                                  //校验重启
 
+     //----------------升级--------------------
+     //获取bin文件大小
+    bool getBinSize(const char* path, unsigned int& size);       
+    //获取bin文件数据                                       
+    bool getBinData(const char* path, unsigned char* data, unsigned int size);   
+     //----------------升级指令--------------------
+    //升级开始
+    bool upgradeStart(const UINT8 addr);            
+     //升级数据开始                                                            
+    bool upgradeDataStart(const UINT8 addr);                 
+    //升级数据 包                                                  
+    bool upgradeData(const UINT8 addr, unsigned char data[], const unsigned short len, UINT8 uIndex); 
+    //升级结束          
+    bool upgradeDataEnd(const UINT8 addr, unsigned char data[], const unsigned short len, UINT8 uIndex) ;//启动升级数据接收线程
+
+    //校验重启
+    bool upgradeReset(const UINT8 addr, const unsigned short FW_checksum);                                  
+    //发送升级数据
     bool sendUpgradeData(unsigned char data[], const unsigned short len);
+
+    //解析图像数据
+    bool parseImgData();  
+    int paraseImgEx(unsigned char* buff);
 
     std::thread m_threadCmd ;
     std::thread m_threadParse;
-    //std::thread m_threadRun;
 
-    UINT8 m_uDeviceAddr = 0x00;                                                 //设备地址   
-    float m_fps = 0.0;                                                          //帧率  
+    //设备地址   
+    UINT8 m_uDeviceAddr = 0x00;   
+     //帧率                                              
+    float m_fps = 0.0;                                                        
 
     std::mutex mtx_data;
     std::mutex mtx_error;
@@ -283,5 +317,12 @@ private:
     std::mutex m_mutProgress;
     UINT64 m_u64DevicesTime = 0;
     int m_iCount = 0;
+    std::mutex m_mutImg;
+    stImgData m_img_data;
+    bool m_isGetImg = false;
+    int m_iRow = 160;
+    int m_iCol = 160;
+    bool m_bFindHead = true;
+    bool m_bDone = true;
 };
 #endif

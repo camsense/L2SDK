@@ -46,6 +46,10 @@ extern "C" {
     void apiGetUpgradeProgress(float& percentage);
     //发送时间戳同步
     bool apiSendTimeStamp(const unsigned int ms);
+    //切换图像模式
+    bool apiSwitchImgMode(const UINT8 addr);
+    //获取图像数据
+    bool apiGetImgData(stImgData& img);
 
 #ifdef __cplusplus
 };

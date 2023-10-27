@@ -27,13 +27,14 @@ public:
     void getUpgradeProgress(float& percentage);
 
     bool sendTimeStamp(const unsigned int ms);
-
+    bool sendImgMode(const UINT8 addr);
+    bool getImgData(stImgData& img);
 protected:
 	CL2DeviceHandle();
     CBase m_pBase;
 
 private:
-    std::string m_strSdkVersion = "V1.0.6";
+    std::string m_strSdkVersion = "V1.0.8";
 
 };
 
