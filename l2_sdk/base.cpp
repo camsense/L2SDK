@@ -30,6 +30,7 @@ bool CBase::init(const char *chPort, int iBaute)
         return false;
     }
 
+    std::vector<DeviceInfo>().swap(m_vcDeviceInfo);
 
     m_thread_enable = true;
     delay(1);

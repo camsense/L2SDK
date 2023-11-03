@@ -1,0 +1,7 @@
+<?xml version="1.0" ?>
+<launch>
+    <arg name="ip" default="667"/>
+    <node pkg="lcm2ros" type="lcmTunnel.sh" name="lcmTunnel"  output="screen" args="$(arg ip)"/>
+    <node pkg="lcm2ros" type="lcm2ros" name="lcm2ros" output="screen" args="$(arg ip)"/> 
+    <node pkg="rviz" type="rviz" name="rviz" output="screen"/>
+</launch>
