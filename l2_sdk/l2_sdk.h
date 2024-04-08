@@ -50,6 +50,8 @@ extern "C" {
     bool apiSwitchImgMode(const UINT8 addr);
     //获取图像数据
     bool apiGetImgData(stImgData& img);
+     //整机模式
+    bool apiAllStartScan();
 
 #ifdef __cplusplus
 };

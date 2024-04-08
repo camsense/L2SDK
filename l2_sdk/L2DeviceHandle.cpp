@@ -33,6 +33,11 @@ bool CL2DeviceHandle::stopScanDevice()
     return m_pBase.StopScanCmd();
 }
 
+bool CL2DeviceHandle::allStratScanDevice()
+{
+    return m_pBase.AllStartScanCmd();
+}
+
 void CL2DeviceHandle::getFps(float& fps)
 {
     m_pBase.getFps(fps);

@@ -8,17 +8,7 @@
 #include <cstdlib>
 #include <stdio.h>
 #include <string.h>
-#include <assert.h>
-#include <thread>
-#include<fstream>
-#include<stdio.h>
-#include <string.h>
-#include<unistd.h>
-#include "l2_sdk.h"
- #include "lcm_std_msgs/lcm_utils.h"
-#include "lcm_std_msgs/Point32.hpp"
-#include "lcm_std_msgs/Int8.hpp"
-#include "lcm/lcm-cpp.hpp"
+#define FILENAME "30mm.bmp"
 
 // TODO: 在此处引用程序需要的其他标头。
 
@@ -60,6 +50,42 @@ struct tagRGBPallete
 
 #ifdef __unix
 #define fopen_s(pFile,filename,mode) ((*(pFile))=fopen((filename),(mode)))==NULL
+#endif
+#if 0
+//读取数据的函数
+unsigned char** readData(BMPFILEHEADER& bmpfileheader, BITMAPINFOHEADER& bitmapinfoheader)
+{
+	FILE* fp = NULL;  // C标准库的文件指针
+	fopen_s(&fp, FILENAME, "rb"); // 二进制读取方式打开文件
+	unsigned char** data = NULL;
+
+	// 读取文件头
+	fread(&bmpfileheader, sizeof(bmpfileheader), 1, fp);
+	// 读取信息头
+	fread(&bitmapinfoheader, sizeof(bitmapinfoheader), 1, fp);
+
+	//读取调色板
+	tagRGBPallete  rgb[256];
+	memset(rgb, 0, sizeof(tagRGBPallete)*256);
+	fread(rgb, sizeof(tagRGBPallete)*256, 1, fp);
+	// 动态分配二维数组存储像素数据，注意先申请一个存放指针的数组，
+	data = (unsigned char **)malloc(sizeof(unsigned char*) * bitmapinfoheader.biHeight );
+	//其大小为sizeof(unsigned char*) * bitmapinfoheader.biHeight，这点很容易错
+	//申请行指针
+	for (int i = 0; i < bitmapinfoheader.biHeight; i++)
+	{
+		data[i] = (unsigned char *)malloc(bitmapinfoheader.biWidth  );
+		// 读取像素数据
+		for (int j = 0; j < bitmapinfoheader.biWidth ; j++)
+		{
+			fread(&data[i][j], 1, 1, fp);
+		}
+	}
+
+	return data;
+	// 关闭读取的文件
+	fclose(fp);
+}
 #endif
 
 
@@ -106,97 +132,4 @@ void saveImgData(unsigned char data[], const char* newFileName, std::string strT
 	fclose(fp2);
 }
 
-//点云
-#define POINT_MODE 1
-#define IMG_MODE 3
-
-class EchoTest {
-public:
-	void L2SartCallback(const lcm::ReceiveBuffer* rbuf, const std::string& chan,
-							const lcm_std_msgs:: Int8 * msgs)
-	{
-		L2SartCallback(*msgs);
-	}
-
-	void L2SartCallback(const lcm_std_msgs:: Int8 &   cmd){
-		uint8_t  addr = (cmd.data & 0xF0) >> 4;
-		uint8_t  mode = (cmd.data & 0x0F);
-		printf("mode: %d\n", mode);
-		printf("addr: %d\n", addr);
-		switch (mode)
-		{
-		case 1:
-			if(m_mode != POINT_MODE ||  m_iCurAddr != addr ){
-				m_iCurAddr = addr;
-				m_bExit = true;
-				apiSDKUninit();
-				apiSDKInit(m_strPort.c_str(), 921600);
-				if (m_imgThread.joinable())
-				{
-					m_imgThread.join();
-				}
-				if (m_pointThread.joinable())
-				{
-					m_pointThread.join();
-				}
-				usleep(20 * 1000);
-				m_bExit = false;
-				m_pointThread = std::thread(&EchoTest::point_mode,  this);
-			}
-			m_mode = POINT_MODE;
-			break;
-		case 3:
-			if(m_mode != IMG_MODE ||  m_iCurAddr != addr ){
-				m_iCurAddr = addr;
-				apiSDKUninit();
-				apiSDKInit(m_strPort.c_str(), 921600);
-				m_bExit = true;
-				usleep(20 * 1000);
-				if (m_imgThread.joinable())
-				{
-					m_imgThread.join();
-				}
-				if (m_pointThread.joinable())
-				{
-					m_pointThread.join();
-				}
-				m_bExit = false;
-				m_imgThread = std::thread(&EchoTest::img_mode,  this);
-			}
-			m_mode = IMG_MODE;
-			break;
-		default:
-			break;
-		}
-	}
-
-	inline std::string getLcmUrl(int64_t ttl) {
-  		assert(ttl >= 0 && ttl <= 255);
- 	 	return "udpm://239.255.76.67:7667?ttl=" + std::to_string(ttl);
-	}	
-	inline void setPort(const std::string strPort){ m_strPort =  strPort;}
-	inline void setMode(const int iMode){ m_mode =  iMode;}
-
-	void run(int type){
-			if (POINT_MODE == type){
-				m_pointThread = std::thread(&EchoTest::point_mode,  this);
-			}
-			else if(IMG_MODE == type){
-				m_imgThread = std::thread(&EchoTest::img_mode,  this);
-			}
-	}
-
-	lcm::LCM m_lcm;
-
-private:
-	int point_mode();
-	int img_mode();
-	bool m_bExit = false;
-	std::thread m_pointThread;
-	std::thread m_imgThread;
-	std::string m_strPort = "";
-	int m_mode = POINT_MODE;					//1 -  正常模式  3  - 图像模式
-	int m_iCurAddr = 0x01;
-	
-};
 

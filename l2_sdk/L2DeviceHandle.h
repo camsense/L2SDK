@@ -17,6 +17,7 @@ public:
     UINT8 getNumberOfDevice();                                              //获取设备数量
     bool starScanDevice();                                                  //开始扫描
     bool stopScanDevice();                                                  //停止扫描
+    bool allStratScanDevice();                                           //整机模式
     void getFps(float& fps);
     void getPointData(std::vector<stOutputPoint>& data);                    //获取点云
     void getErrorCode(ErrorCode& error);                                    //获取错误码
@@ -34,7 +35,7 @@ protected:
     CBase m_pBase;
 
 private:
-    std::string m_strSdkVersion = "V1.0.8";
+    std::string m_strSdkVersion = "V1.0.9";
 
 };
 

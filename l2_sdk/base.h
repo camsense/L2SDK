@@ -37,10 +37,7 @@ enum CmdEmun{eInit, eGetAddr, eGetInfo, eScanStop};
 
 #pragma pack(1)
 typedef struct _Point2D{
-#if 0
-    int x;   
-    unsigned short y;  
-#else
+
     short x : 14;                       //x坐标，单位0.1mm，有符号
     unsigned short flag : 1;            //有效标志位
     unsigned short fiter : 1;           //过滤标志位
@@ -48,18 +45,9 @@ typedef struct _Point2D{
     unsigned short reserve : 4;         //保留位
     unsigned char quality : 8;          //亮度信息
     UINT8 row : 8;                      //行
-#endif
 } Point2D;
 
 typedef struct _PckData {
-#if 0
-    unsigned short usHD;
-	unsigned char ucAD;
-	unsigned char ucDN;
-	Point2D data[160];
-    unsigned short usVP;
-    unsigned short checksum;
-#else
     unsigned short usHead;      //包头
     unsigned char ucAddr;       //地址
     unsigned char param_h;      //参数H
@@ -68,7 +56,6 @@ typedef struct _PckData {
     unsigned char param_v;      //参数V
     unsigned char param_e;      //参数e
     unsigned short usCheckSum;  //校验和
-#endif
 } PKGDATA;
 
 //时间同步
@@ -195,7 +182,10 @@ public:
 
     //切换图像模式
     bool sendImgCmdMode(const UINT8 uaddr );   
-    bool getImgData(stImgData& img) ;              
+    bool getImgData(stImgData& img) ;     
+
+    //整机标定模式    
+     bool  AllStartScanCmd();            
 
 protected:
     HC_serial m_serial;

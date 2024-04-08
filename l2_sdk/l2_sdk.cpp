@@ -219,6 +219,19 @@ extern "C" {
         return CL2DeviceHandle::Instance().getImgData(img);
     }
 
+  /*************************************************
+	@Function: 				apiAllStartScan()
+	@Description: 			整机模式
+	@Input:					nothing
+	@Output:  				nothing
+	@Return: 				false表示失败, true表示成功
+	@Others:
+	*************************************************/
+    bool apiAllStartScan()
+    {
+        return CL2DeviceHandle::Instance().allStratScanDevice();
+    }
+
 #ifdef __cplusplus
 };
 #endif

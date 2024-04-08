@@ -2,17 +2,12 @@
 //
 
 #include "L2_SDK_Demo.h"
+#include "l2_sdk.h"
 #include <thread>
 #include<fstream>
 #include<stdio.h>
 #include <string.h>
-#include <opencv2/opencv.hpp>
-#include "Image.hpp"
-#include "PointCloud.hpp"
-#include "lcm_std_msgs/lcm_utils.h"
-#include "lcm_std_msgs/Point32.hpp"
-#include "lcm_std_msgs/Int8.hpp"
-#include "lcm/lcm-cpp.hpp"
+//#include <opencv2/opencv.hpp>
 
 #ifdef __linux__
 #include <unistd.h>
@@ -22,7 +17,6 @@
 
 using namespace std;
 
-
 static void delay(UINT32 ms) {
 #ifdef __linux__
 	if(ms != 0){usleep(ms * 1000);}
@@ -31,8 +25,6 @@ static void delay(UINT32 ms) {
 #endif
 }
 
-
-//数据保存
 static void savedata(std::vector<stOutputPoint>& data)
 {
     for (auto it : data)
@@ -54,7 +46,6 @@ static void savedata(std::vector<stOutputPoint>& data)
     std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
-//获取升级进度
 static float g_fPercentage = 0x00;
 static bool g_bEnable = false;
 void showProcess(float temp ) {
@@ -73,15 +64,6 @@ void showProcess(float temp ) {
 }
 
 
-
-//切换成点云模式
-void switch_mode(lcm::LCM* lcm){
-    EchoTest handler;
-    lcm->subscribe("SartCloudPoint", &EchoTest::L2SartCallback, &handler) ;
-    lcm->subscribe("SartImg", &EchoTest::L2SartCallback, &handler) ;
-    while(0 == lcm->handle());   
-}
-
 int main()
 {
 	cout << "camsense L2 sdk" << endl;
@@ -97,20 +79,15 @@ int main()
 	std::string strVersion = apiGetVersion();
 	cout << "sdk version: "<< strVersion << endl;
 
-    cout << "请输入设备串口号: " << endl;
+	printf("Please select COM:\n");
 	int port = 0;
 	std::cin >> port;
 
-	std::string strPort = "/dev/ttyUSB" + std::to_string(port);
+	std::string strPort = "//./COM" + std::to_string(port);
 
-    EchoTest handler;
-    lcm::LCM lcm(handler.getLcmUrl(255));
-    if(!lcm.good())
-    {
-        return 1;
-    }
-    handler.m_lcm = lcm;
-    handler.setPort(strPort);
+#if  __linux__
+	strPort = "/dev/ttyUSB" + std::to_string(port);
+#endif
 
 	if (!apiSDKInit(strPort.c_str(), 921600))
 	{
@@ -133,10 +110,12 @@ int main()
         thProcess.detach();
 
         int iRes = apiUpgradeBin(strPath.c_str(), addr);
-        if (iRes < 0) {
+        if (iRes < 0)
+        {
             std::cout << "升级失败：" << iRes << endl;
         }
-        else{
+        else
+        {
             std::cout << "升级成功！" << endl;
         }
 
@@ -148,200 +127,219 @@ int main()
         }
     }
     else if(type == 1){
-        handler.setMode(1);
-        handler.run(type);
-    }
-    else if (3 == type){
-        handler.setMode(3);
-        handler.run(type);
-    }
+        //----------------------------------------------
+        //如果当前为图像模式
+        apiStopScan();
+        delay(1400);
+        //----------------------------------------------
 
-    lcm.subscribe("SartCloudPoint", &EchoTest::L2SartCallback, &handler) ;
-    lcm.subscribe("SartImg", &EchoTest::L2SartCallback, &handler) ;
-    while(0 == lcm.handle());   
+        int nAddr = apiGetDeviceAddr();
+        if (nAddr == 0) {
+            cout << "apiGetDeviceAddr fail!" << endl;
+            apiSDKUninit();
+            return 0;
+        }
+        cout << "max addr:" << nAddr << endl;
+
+        for (int i = 1; i <= nAddr; i++) {
+            std::string file = "addr" + std::to_string(i) + ".csv";
+            std::ofstream in(file);
+            in << "loctime,devicetime,Exptime,是否有效,是否滤波,x,y,亮度信息,row" << endl;
+            in.close();
+        }
+
+        std::vector<DeviceInfo> info;
+        if (!apiGetDeviceInfo(info))
+        {
+            cout << "get device info failed" << endl;
+            return 0;
+        }
+
+        for (auto it : info) {
+            printf("add:%d, factoryInfo:%s,firmwareVersion:%s, productName:%s, SN:%s\r\n",
+                it.addr, it.factoryInfo.c_str(), it.firmwareVersion.c_str(), it.productName.c_str(), it.deviceSN.c_str());
+        }
+
+        cout << "get device info  fanish!" << endl;
+        delay(15);
+
+        if (!apiStartScan()) {
+            cout << "device scan failed!" << endl;
+            apiSDKUninit();
+            return 0;
+        }
+        cout << "device scan fanish!" << endl;
+
+        int nTestCount = 1;
+        while (nTestCount++ < 300) {
+            std::vector<stOutputPoint> data;
+            apiGetPointData(data);
+            if (data.size() > 0) {
+                savedata(data);
+                float fps = 0;
+                apiGetDeviceFps(fps);
+                std::cout << "fps: " << fps << endl;
+            }
+            else {
+                ErrorCode error;
+                apiGetErrorCode(error);
+                if (error != IDLE)
+                {
+                    cout << "error: " << error << endl;
+                }
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            std::this_thread::yield();
+        };
+		
+		if(!apiStopScan()){
+			cout << "apiStopScan failed:!"  << endl;
+			return -1;
+		}
+		delay(10);
+		
+		cout << "in all mode"  << endl;
+		if(!apiAllStartScan()){
+			cout << "apiAllStartScan failed:!"  << endl;
+			return -1;
+		}
+		cout << "in all mode finish"  << endl;
+		nTestCount = 1;
+        while (nTestCount++ < 300) {
+            std::vector<stOutputPoint> data;
+            apiGetPointData(data);
+            if (data.size() > 0) {
+                savedata(data);
+                float fps = 0;
+                apiGetDeviceFps(fps);
+                std::cout << "fps: " << fps << endl;
+            }
+            else {
+                ErrorCode error;
+                apiGetErrorCode(error);
+                if (error != IDLE)
+                {
+                    cout << "error: " << error << endl;
+                }
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            std::this_thread::yield();
+        };
+		
+		if(!apiStopScan()){
+			cout << "apiStopScan failed:!"  << endl;
+			return -1;
+		}
+		delay(10);
+		
+		cout << "进入正常模式"  << endl;
+		if(!apiStartScan()){
+			cout << "apiStartScan failed:!"  << endl;
+			return -1;
+		}
+		cout << "进入正常模式 finish"  << endl;
+while (1) {
+            std::vector<stOutputPoint> data;
+            apiGetPointData(data);
+            if (data.size() > 0) {
+                savedata(data);
+                float fps = 0;
+                apiGetDeviceFps(fps);
+                std::cout << "fps: " << fps << endl;
+            }
+            else {
+                ErrorCode error;
+                apiGetErrorCode(error);
+                if (error != IDLE)
+                {
+                    cout << "error: " << error << endl;
+                }
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+            std::this_thread::yield();
+        };
+		
+    }
+    else if (3 == type)
+    {
+        apiStopScan();
+        delay(1400);
+        int nAddr = apiGetDeviceAddr();
+        if (nAddr == 0) {
+            cout << "apiGetDeviceAddr fail!" << endl;
+            apiSDKUninit();
+            return 0;
+        }
+        cout << "max addr:" << nAddr << endl;
+
+        for (int i = 1; i <= nAddr; i++) {
+            std::string file = "addr" + std::to_string(i) + ".csv";
+            std::ofstream in(file);
+            in << "loctime,devicetime,Exptime,是否有效,是否滤波,x,y,亮度信息,row" << endl;
+            in.close();
+        }
+
+        std::vector<DeviceInfo> info;
+        if (!apiGetDeviceInfo(info))
+        {
+            cout << "get device info failed" << endl;
+            return 0;
+        }
+
+        for (auto it : info) {
+            printf("add:%d, factoryInfo:%s,firmwareVersion:%s, productName:%s, SN:%s\r\n",
+                it.addr, it.factoryInfo.c_str(), it.firmwareVersion.c_str(), it.productName.c_str(), it.deviceSN.c_str());
+        }
+
+        cout << "get device info  fanish!" << endl;
+        delay(15);
+
+        printf("Please select addr:\n");
+	    int addr = 1;
+        std::cin >> addr;
+        if (addr > nAddr || addr <= 0) 
+        {
+            /* code */
+             printf("input  addr failed!\n");
+            return 0;
+        }
+        
+        if (!apiSwitchImgMode(addr))
+        {
+             printf("apiSwitchImgMode failed!\n");
+            apiSDKUninit();
+            return 0;
+        }
+        
+        int Index = 0;
+        while (1)
+        {
+            std::string strType = info.at(addr - 1).productName;
+            std::string strFileName = std::to_string(Index) + ".bmp";
+            stImgData imgData;
+            if(apiGetImgData(imgData)){
+                 printf("get img data: %d.bmp\n",Index);
+                saveImgData(imgData.data, strFileName.c_str(), strType);
+
+                 //cv::Mat imgTemp(160, 160, CV_8UC1);
+                //memcpy(imgTemp.data,imgData.data , 160* 160 );
+               // cv::imwrite(std::to_string(Index) +"_0cv.bmp" , imgTemp); 
+               
+                Index++;
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(200));
+            std::this_thread::yield();
+        }
+        
+    }
     
+
 	cout << "exit out!" << endl;
 	delay(10);
 	apiSDKUninit();
    
 	return 0;
-}
-
-int EchoTest::point_mode()
-{
-       //----------------------------------------------
-    //如果当前为图像模式,需要处理
-    apiStopScan();
-    delay(1400);
-    //----------------------------------------------
-
-    int nAddr = apiGetDeviceAddr();
-    if (nAddr == 0) {
-        cout << "apiGetDeviceAddr fail!" << endl;
-        apiSDKUninit();
-        return 0;
-    }
-    cout << "max addr:" << nAddr << endl;
-
-    for (int i = 1; i <= nAddr; i++) {
-        std::string file = "addr" + std::to_string(i) + ".csv";
-        std::ofstream in(file);
-        in << "loctime,devicetime,Exptime,是否有效,是否滤波,x,y,亮度信息,row" << endl;
-        in.close();
-    }
-
-    std::vector<DeviceInfo> info;
-    if (!apiGetDeviceInfo(info))
-    {
-        cout << "get device info failed" << endl;
-        return 0;
-    }
-
-    for (auto it : info) {
-        printf("add:%d, factoryInfo:%s,firmwareVersion:%s, productName:%s, SN:%s\r\n",
-            it.addr, it.factoryInfo.c_str(), it.firmwareVersion.c_str(), it.productName.c_str(), it.deviceSN.c_str());
-    }
-
-    cout << "get device info  fanish!" << endl;
-    delay(15);
-
-    if (!apiStartScan()) {
-        cout << "device scan failed!" << endl;
-        apiSDKUninit();
-        return 0;
-    }
-    cout << "device scan fanish!" << endl;
-
-    while (!m_bExit) {
-        std::vector<stOutputPoint> data;
-        apiGetPointData(data);
-        if (data.size() > 0) {
-            savedata(data);
-            for(int i = 0;i < data.size();i++)
-            {   
-                lcm_sensor_msgs::PointCloud point_cloud_msg;
-                struct timespec tp;
-                clock_gettime(CLOCK_REALTIME, &tp);
-                point_cloud_msg.header.frame_id = "map";
-                point_cloud_msg.header.stamp.sec = tp.tv_sec;
-                point_cloud_msg.header.stamp.nsec = tp.tv_nsec;
-                for(int j = 0;j < data[i].Point.size();j++)
-                {
-                    if(data[i].Point[j].bflag){
-                        lcm_geometry_msgs::Point32 point;
-                        point.x = data[i].Point[j].x / 1000.0;
-                        point.y = data[i].Point[j].y / 1000.0;
-                            point.z = 0;
-                        point_cloud_msg.points.push_back(point);
-                    }
-                }
-
-                if (data[i].uaddr == m_iCurAddr){
-                    point_cloud_msg.n_points = point_cloud_msg.points.size();
-                    m_lcm.publish("PointCloud", &point_cloud_msg);
-                }
-            }
-         
-            float fps = 0;
-            apiGetDeviceFps(fps);
-            std::cout << "fps: " << fps << endl;
-        }
-        else {
-            ErrorCode error;
-            apiGetErrorCode(error);
-            if (error != IDLE)
-            {
-                cout << "error: " << error << endl;
-            }
-        }
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(5));
-        std::this_thread::yield();
-    };
-    return 0;
-}
-
-int EchoTest::img_mode()
-{
-    apiStopScan();
-    delay(1400);
-    //delay(2400);
-    int nAddr = apiGetDeviceAddr();
-    if (nAddr == 0) {
-        cout << "apiGetDeviceAddr fail!" << endl;
-        apiSDKUninit();
-        return 0;
-    }
-    cout << "max addr:" << nAddr << endl;
-
-    std::vector<DeviceInfo> info;
-    if (!apiGetDeviceInfo(info))
-    {
-        cout << "get device info failed" << endl;
-        return 0;
-    }
-
-    for (auto it : info) {
-        printf("add:%d, factoryInfo:%s,firmwareVersion:%s, productName:%s, SN:%s\r\n",
-            it.addr, it.factoryInfo.c_str(), it.firmwareVersion.c_str(), it.productName.c_str(), it.deviceSN.c_str());
-    }
-
-    cout << "get device info  fanish!" << endl;
-    delay(15);
-    int addr = m_iCurAddr;
-    if (addr > nAddr || addr <= 0) 
-    {
-        /* code */
-        printf("input  addr failed!\n");
-        return 0;
-    }
-    
-    if (!apiSwitchImgMode(addr))
-    {
-        printf("apiSwitchImgMode failed!\n");
-        apiSDKUninit();
-        return 0;
-    }
-        
-    int Index = 0;
-    while (!m_bExit)
-    {
-        std::string strType = info.at(addr - 1).productName;
-        std::string strFileName = "addr"+std::to_string(addr) + "_"+  std::to_string(Index) + ".bmp";
-        stImgData imgData;
-        if(apiGetImgData(imgData)){
-            printf("get img data: %d.bmp\n",Index);
-            saveImgData(imgData.data, strFileName.c_str(), strType);
-
-             //调试下开启图像输出发送到可视化界面
-            int cols = 160, rows = 160;
-            if (strType != "L2C2")
-            {
-                cols = 160;
-                rows = 128;
-            }
-
-            lcm_sensor_msgs::Image rgb_lcm_msg;
-            struct timespec tp;
-            clock_gettime(CLOCK_REALTIME, &tp);
-            rgb_lcm_msg.header.stamp.sec = tp.tv_sec;
-            rgb_lcm_msg.header.stamp.nsec = tp.tv_nsec;
-            rgb_lcm_msg.height = rows;
-            rgb_lcm_msg.width = cols;
-            rgb_lcm_msg.encoding = "8UC1";
-            rgb_lcm_msg.is_bigendian = 0;
-
-            rgb_lcm_msg.step = cols;
-            rgb_lcm_msg.n_data = cols * rows;
-            std::vector< uint8_t > vcData;
-            vcData.resize(cols * rows);
-            memcpy(vcData.data(), imgData.data, cols * rows);
-            rgb_lcm_msg.data.swap(vcData);
-            m_lcm.publish("Image", &rgb_lcm_msg);
-            Index++;
-        }
-        std::this_thread::sleep_for(std::chrono::milliseconds(200));
-        std::this_thread::yield();
-    };
-    return 0;
 }
