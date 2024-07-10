@@ -949,8 +949,9 @@ void CBase::ThreadParse()
 //发送cmd数据
 bool CBase::sendData(unsigned char data[], const int len)
 {
+#define  SENDDATA_COUNT_MAX 10
      int iCount = 0;
-    while (iCount++ < 3)    //重发三次机制
+    while (iCount++ < SENDDATA_COUNT_MAX)    //重发三次机制
     {
         if (m_serial.writeData2(data, len) < 1)
         {
@@ -982,20 +983,32 @@ bool CBase::sendData(unsigned char data[], const int len)
 void CBase::readDataThread()
 {
     //delay(50);
+#define DATA_LEN   1024
+#define DATA_TIME  3000
+    double dBegin = m_serial.GetTimeStamp() / 1.0e6;
+    double dEnd = m_serial.GetTimeStamp() / 1.0e6;
     std::vector<unsigned char>().swap(m_lstTemp);
     while (m_thread_enable)
     {
-#define DATA_LEN   1024
+
         unsigned char data[DATA_LEN] = { 0 };
         int iLen = m_serial.readData(data, DATA_LEN, 100);
         if (iLen <= 0) {
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
             std::this_thread::yield();
+            dEnd = m_serial.GetTimeStamp() / 1.0e6;
+            if (dEnd - dBegin > DATA_TIME) {
+                dBegin = m_serial.GetTimeStamp() / 1.0e6;
+                writeErrorCode(ERROR_NOT_DATA);
+                 printf("error: not data\n");
+            }
+           
         }
         else {
             std::lock_guard<std::mutex> lck(m_mtxBuff);
             std::vector<unsigned char> vcTmp(std::begin(data), std::begin(data) + iLen);
             m_lstTemp.insert(m_lstTemp.end(), vcTmp.begin(), vcTmp.end());
+            dBegin = m_serial.GetTimeStamp() / 1.0e6;
         }
         // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     };
@@ -1302,11 +1315,13 @@ int CBase::upgradeBin(const char* path, const UINT8 addr)
     m_threadCmd = std::thread(&CBase::ThreadCmd, this);
     m_threadParse = std::thread(&CBase::ThreadParse, this);
    
-    if (!getDeviceAddrCmd())
-    {
-        printf("send get ID cmd failed\n");
-        return -2;            //串口发送命令失败
-    }                       
+    //if (!getDeviceAddrCmd())
+    //{
+    //    printf("send get ID cmd failed\n");
+    //    return -2;            //串口发送命令失败
+    //}      
+
+    getDeviceAddrCmd();               
     delay(20);
 
     setProgress(2);
