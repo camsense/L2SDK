@@ -198,6 +198,24 @@ int main()
 			return -1;
 		}
 		delay(10);
+    
+        //读取线程退出错误码
+        delay(100);
+        ErrorCode error;
+        apiGetErrorCode(error);
+        if (error != IDLE)
+        {
+            /* code */
+              cout << "read thread exit error: " << error << endl;
+        }
+         //解析线程退出错误码
+          apiGetErrorCode(error);
+        if (error != IDLE)
+        {
+            /* code */
+              cout << "parese thread exit error: " << error << endl;
+        }
+        
 		
 		cout << "in all mode"  << endl;
 		if(!apiAllStartScan()){

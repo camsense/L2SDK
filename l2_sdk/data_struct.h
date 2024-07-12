@@ -74,19 +74,21 @@ typedef struct _OutputPoint
 //错误码
  enum ErrorCode{
     IDLE = 0,
-    ERROR_INIT_FAIL = -1000,                            //init失败
+    ERROR_INIT_FAIL = -1000,                                 //init失败
     ERROR_OPEN_SERIAL_FAIL ,                            //open com failed
-    ERROR_ADDR_CMD_FAIL,                                //获取地址命令失败
-    ERROR_INFO_CMD_FAIL,                                //获取设备信息命令失败
-    ERROR_STARTSCAN_CMD_FAIL,                           //开始扫描命令失败     
-    ERROR_STOPSCAN_CMD_FAIL,                            //停止扫描命令失败
-    ERROR_NOT_DATA,                                     //设备无数据
+    ERROR_ADDR_CMD_FAIL,                                    //获取地址命令失败
+    ERROR_INFO_CMD_FAIL,                                    //获取设备信息命令失败
+    ERROR_STARTSCAN_CMD_FAIL,                    //开始扫描命令失败     
+    ERROR_STOPSCAN_CMD_FAIL,                     //停止扫描命令失败
+    ERROR_NOT_DATA,                                             //设备无数据
     ERROR_CHECKSUM_FAIL,                                //校验和失败
 
     ERROR_UPDATE_CHECKSUM,                              //升级数据包校验和错误
     ERROR_UPDATE_FILTER,                                //升级的固件不匹配
     ERROR_UPDATE_SEQ,                                   //升级顺序错误
-    ERROR_UPDATE_FW_CHECKSUM                            //固件校验和错误
+    ERROR_UPDATE_FW_CHECKSUM,                            //固件校验和错误
+    ERROR_READ_THREAD_EXIT,                                  //read线程退出
+    ERROR_PARSE_THREAD_EXIT,                                //解析线程退出
 };
 
 //图片数据

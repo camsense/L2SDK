@@ -35,7 +35,7 @@ protected:
     CBase m_pBase;
 
 private:
-    std::string m_strSdkVersion = "V1.0.10";
+    std::string m_strSdkVersion = "V1.0.11";
 
 };
 

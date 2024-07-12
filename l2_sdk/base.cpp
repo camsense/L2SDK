@@ -386,7 +386,9 @@ int CBase::getPointData(std::vector<stOutputPoint>& point, int len)
         }
         for (int i = 0; i < len; i++)
         {
-            point.push_back(m_quePointData.front());
+            //point.push_back(m_quePointData.front());
+            //取最新的一帧数据
+            point.push_back(m_quePointData.back());
             m_quePointData.pop();
         }
     }
@@ -669,7 +671,7 @@ void CBase::writePointBuffer(stOutputPoint& data)
 {
     std::unique_lock<std::mutex> ulck(mtxPointData);
     {
-        if (m_quePointData.size() == MAX_LEN)
+        if (m_quePointData.size() == POINT_MAX)
         {
             m_quePointData.pop();
         }
@@ -681,7 +683,7 @@ void CBase::writeErrorCode(ErrorCode error)
 {
     std::unique_lock<std::mutex> ulck(mtx_error);
     {
-        if (m_errorCode.size() == MAX_LEN)
+        if (m_errorCode.size() == ERROR_MAX)
         {
             m_errorCode.pop();
         }
@@ -1012,6 +1014,8 @@ void CBase::readDataThread()
         }
         // std::this_thread::sleep_for(std::chrono::milliseconds(1));
     };
+
+    writeErrorCode(ERROR_READ_THREAD_EXIT);
 }
 
 //解析点云数据线程
@@ -1091,6 +1095,8 @@ void CBase::parseDataThread()
             break;
         }
     }
+
+    writeErrorCode(ERROR_PARSE_THREAD_EXIT);
 
 }
 
@@ -1458,7 +1464,8 @@ int CBase::upgradeBin(const char* path, const UINT8 addr)
     UpgradeUninit();
     setProgress(100);
 
-    return true;
+    //return true;
+    return 0;
 }
 
 bool CBase::sendTimeStamp(const unsigned int ms)

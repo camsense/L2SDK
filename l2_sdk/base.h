@@ -25,6 +25,8 @@
 #define STOP                0x0d
 
 #define MAX_LEN 968 * 10
+#define POINT_MAX       5
+#define ERROR_MAX      20
 enum DistPkgEmun {
     eTimeHead0 = 0,
     eTimeHead1,
